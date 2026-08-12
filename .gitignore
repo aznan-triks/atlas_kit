@@ -1,0 +1,12 @@
+__pycache__/
+*.pyc
+.pytest_cache/
+*.egg-info/
+atlas.json
+semantic_index.json
+.env
+
+# AI context files (private)
+CLAUDE.md
+CONTEXT.md
+MEMORY.md
