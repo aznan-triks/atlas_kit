@@ -36,10 +36,28 @@ Pick a provider and export its key:
     export GEMINI_API_KEY=...
     atlas-kit embed --provider gemini        # incremental — only new/changed entries cost a call
     atlas-kit search "cancel a running job" --provider gemini
+    atlas-kit similar                        # near-duplicate report — offline, no API key
     atlas-kit status                         # offline — index state, no network call
 
 Missing or invalid key, or quota exceeded: the command exits non-zero with a message
 naming the problem. There is never a silent fallback to another provider or to mode 1.
+
+**`atlas-kit similar`** finds near-duplicate entries already sitting in the index —
+all-pairs cosine similarity, entirely offline (no network call, no API key, zero
+quota cost). Run it after `embed` to spot redundant symbols. `--section` restricts
+pairs to one section; `--exclude-same-file` drops same-file pairs (included by
+default).
+
+**BREAKING: `--min-score` on `search` changed meaning.** It used to be an absolute
+cosine cutoff (e.g. `0.55`). It is now a z-score multiplier k, default `1.0`: a
+result is kept only if its score >= mean + k*stdev of that query's full score
+distribution. A saved script still passing the old-style value (e.g.
+`--min-score 0.55`) will behave very differently now — re-tune it. `similar` has
+its own, stricter `--min-score` default (`2.0`).
+
+The first `atlas-kit embed` run after upgrading auto-migrates the index's internal
+key format (one-time, printed to stdout, no extra API call/quota cost) and starts
+pruning entries for symbols no longer in the atlas.
 
 ## Adding a provider
 

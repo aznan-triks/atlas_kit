@@ -9,8 +9,9 @@ from pathlib import Path
 from atlas_kit.index_store import load_json, save_json
 from atlas_kit.scan import build_atlas
 from atlas_kit.semantic import (
-    DEFAULT_BATCH_SIZE, DEFAULT_MIN_SCORE, DEFAULT_TIMEOUT_S, DEFAULT_TOP_K,
-    cmd_embed as _cmd_embed, cmd_search as _cmd_search, cmd_status as _cmd_status,
+    DEFAULT_BATCH_SIZE, DEFAULT_MIN_ZSCORE, DEFAULT_SIMILAR_MIN_ZSCORE, DEFAULT_TIMEOUT_S,
+    DEFAULT_TOP_K, cmd_embed as _cmd_embed, cmd_search as _cmd_search,
+    cmd_similar as _cmd_similar, cmd_status as _cmd_status,
 )
 
 EXIT_OK = 0
@@ -72,6 +73,10 @@ def cmd_search(args: argparse.Namespace) -> int:
                        args.section, args.timeout)
 
 
+def cmd_similar(args: argparse.Namespace) -> int:
+    return _cmd_similar(Path(args.index), args.min_score, args.section, args.exclude_same_file)
+
+
 def cmd_status(args: argparse.Namespace) -> int:
     return _cmd_status(Path(args.atlas), Path(args.index))
 
@@ -116,10 +121,33 @@ def build_parser() -> argparse.ArgumentParser:
     p_search.add_argument("--model", default=None)
     p_search.add_argument("--dimensions", type=int, default=None)
     p_search.add_argument("--top-k", type=int, default=DEFAULT_TOP_K)
-    p_search.add_argument("--min-score", type=float, default=DEFAULT_MIN_SCORE)
+    p_search.add_argument("--min-score", type=float, default=DEFAULT_MIN_ZSCORE, help=(
+        "Relative z-score multiplier k (BREAKING CHANGE: no longer an absolute cosine "
+        "cutoff). A candidate is kept only if its score >= mean + k*stdev of the full "
+        "score distribution. Skipped entirely when the index has fewer than 5 entries."
+    ))
     p_search.add_argument("--section", default=None)
     p_search.add_argument("--timeout", type=float, default=DEFAULT_TIMEOUT_S)
     p_search.set_defaults(func=cmd_search)
+
+    p_similar = sub.add_parser("similar", help=(
+        "Find near-duplicate index entries — offline, no network call, no API key."
+    ))
+    p_similar.add_argument("--index", default="semantic_index.json")
+    p_similar.add_argument("--min-score", type=float, default=DEFAULT_SIMILAR_MIN_ZSCORE, help=(
+        "Relative z-score multiplier k for this command's own pair-population gate "
+        "(separate default from `search`'s --min-score — near-duplicate detection wants "
+        "precision over recall). A pair is kept only if its score >= mean + k*stdev of "
+        "the full pair-score distribution. Skipped entirely when there are fewer than "
+        "5 pairs."
+    ))
+    p_similar.add_argument("--section", default=None,
+                           help="Only show pairs where both entries are in this section.")
+    p_similar.add_argument("--exclude-same-file", action="store_true", default=False, help=(
+        "Drop pairs whose two entries are in the same file. Same-file pairs are "
+        "INCLUDED by default — this must be opted into explicitly."
+    ))
+    p_similar.set_defaults(func=cmd_similar)
 
     p_status = sub.add_parser("status", help="Index state — offline, no network call.")
     p_status.add_argument("--atlas", default="atlas.json")
