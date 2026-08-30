@@ -23,7 +23,12 @@ def cmd_scan(args: argparse.Namespace) -> int:
     root = Path(args.root).resolve()
     out_path = Path(args.out)
     previous = load_json(out_path, {})
-    atlas = build_atlas(root, ignore_globs=args.ignore or [], previous=previous)
+    try:
+        atlas = build_atlas(root, ignore_globs=args.ignore or [], previous=previous,
+                            parser_mode=args.parser)
+    except RuntimeError as exc:
+        print(str(exc), file=sys.stderr)
+        return EXIT_ERROR
     save_json(out_path, atlas)
     total = sum(len(rows) for rows in atlas["symbols"].values())
     print(f"Indexed {len(atlas['files'])} file(s), {total} symbol(s) -> {out_path}")
@@ -92,6 +97,13 @@ def build_parser() -> argparse.ArgumentParser:
     p_scan.add_argument("--out", default="atlas.json", help="Output JSON path.")
     p_scan.add_argument("--ignore", action="append", default=[],
                         help="Glob to exclude (repeatable), matched against the POSIX-relative path.")
+    p_scan.add_argument("--parser", default="auto", choices=["auto", "regex", "treesitter"], help=(
+        "Only affects .js/.jsx/.ts/.tsx (Python is always ast; Go/Rust are always regex, "
+        "no other backend exists for them yet). 'auto' (default) uses tree-sitter when "
+        "installed, else regex. 'treesitter' forces it and fails loud if the "
+        "'atlas-kit[treesitter]' extra isn't installed. 'regex' keeps the pre-tree-sitter "
+        "best-effort behaviour."
+    ))
     p_scan.set_defaults(func=cmd_scan)
 
     p_find = sub.add_parser("find", help="Search the atlas by pattern.")
@@ -107,7 +119,7 @@ def build_parser() -> argparse.ArgumentParser:
     p_embed = sub.add_parser("embed", help="(Re)index the atlas — needs an API key.")
     p_embed.add_argument("--atlas", default="atlas.json")
     p_embed.add_argument("--index", default="semantic_index.json")
-    p_embed.add_argument("--provider", default="gemini", choices=["gemini", "openai"])
+    p_embed.add_argument("--provider", default="gemini", choices=["gemini", "openai", "local"])
     p_embed.add_argument("--model", default=None)
     p_embed.add_argument("--dimensions", type=int, default=None)
     p_embed.add_argument("--batch-size", type=int, default=DEFAULT_BATCH_SIZE)
@@ -117,7 +129,7 @@ def build_parser() -> argparse.ArgumentParser:
     p_search = sub.add_parser("search", help="Search the atlas by meaning — needs an API key.")
     p_search.add_argument("question")
     p_search.add_argument("--index", default="semantic_index.json")
-    p_search.add_argument("--provider", default="gemini", choices=["gemini", "openai"])
+    p_search.add_argument("--provider", default="gemini", choices=["gemini", "openai", "local"])
     p_search.add_argument("--model", default=None)
     p_search.add_argument("--dimensions", type=int, default=None)
     p_search.add_argument("--top-k", type=int, default=DEFAULT_TOP_K)

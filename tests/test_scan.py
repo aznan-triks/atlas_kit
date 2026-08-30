@@ -69,6 +69,7 @@ def test_parse_generic_file_unknown_extension_returns_empty(tmp_path):
 def test_should_ignore_default_dirs():
     assert should_ignore("node_modules/pkg/index.js", [])
     assert should_ignore(".git/HEAD", [])
+    assert should_ignore(".claude/skills/foo/SKILL.md", [])
     assert not should_ignore("src/main.py", [])
 
 

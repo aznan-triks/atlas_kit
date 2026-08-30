@@ -19,6 +19,7 @@ class OpenAIProvider:
     default_model = DEFAULT_MODEL
     default_dimensions = DEFAULT_DIMENSIONS
     env_var = "OPENAI_API_KEY"
+    requires_api_key = True
 
     def embed(self, request: EmbedRequest, http_post=None) -> list[list[float]]:
         post = http_post or _default_http_post

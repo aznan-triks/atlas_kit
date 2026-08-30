@@ -195,8 +195,36 @@ def search(index: dict, query_vector: list[float], top_k: int, min_score: float,
     return hits[:top_k]
 
 
-def _resolve_api_key(provider) -> str | None:
-    return os.environ.get(provider.env_var) or None
+def _resolve_api_keys(provider) -> list[str]:
+    """Reads `{ENV_VAR}S` (plural, comma-separated) first — enables key rotation on
+    quota exhaustion. Falls back to the singular `{ENV_VAR}` as a single-key list.
+    Returns [] if neither is set."""
+    plural = os.environ.get(f"{provider.env_var}S")
+    if plural:
+        keys = [k.strip() for k in plural.split(",") if k.strip()]
+        if keys:
+            return keys
+    single = os.environ.get(provider.env_var)
+    return [single] if single else []
+
+
+def _embed_with_rotation(provider, keys: list[str], request: EmbedRequest) -> list[list[float]]:
+    """Tries each key in order, rotating to the next ONLY on QuotaExhausted (HTTP 429).
+    InvalidApiKey is never rotated past — Fail Fast, propagates immediately (a bad key
+    is a config error, not a capacity problem another key would fix). Every rotation is
+    printed (key identified by position, never by value) — never a silent switch."""
+    last_exc: QuotaExhausted | None = None
+    for i, key in enumerate(keys, start=1):
+        request.api_key = key
+        try:
+            return provider.embed(request)
+        except QuotaExhausted as exc:
+            last_exc = exc
+            if i < len(keys):
+                print(f"Key {i}/{len(keys)} exhausted (HTTP 429) — rotating to key {i + 1}/{len(keys)}.",
+                      file=sys.stderr)
+            continue
+    raise last_exc
 
 
 def cmd_embed(atlas_path: Path, index_path: Path, provider_name: str, model: str | None,
@@ -205,11 +233,15 @@ def cmd_embed(atlas_path: Path, index_path: Path, provider_name: str, model: str
     model = model or provider.default_model
     dim = dimensions or provider.default_dimensions
 
-    api_key = _resolve_api_key(provider)
-    if not api_key:
-        print(f"Missing API key: set {provider.env_var} to use --provider {provider.name}.",
-              file=sys.stderr)
-        return 2
+    if provider.requires_api_key:
+        api_keys = _resolve_api_keys(provider)
+        if not api_keys:
+            print(f"Missing API key: set {provider.env_var} (or {provider.env_var}S for "
+                  f"multiple, comma-separated, rotated on quota) to use --provider {provider.name}.",
+                  file=sys.stderr)
+            return 2
+    else:
+        api_keys = [""]
 
     atlas = load_json(atlas_path, {"symbols": {}})
     entries = iter_atlas_entries(atlas, model=model, dim=dim)
@@ -255,8 +287,8 @@ def cmd_embed(atlas_path: Path, index_path: Path, provider_name: str, model: str
         for start in range(0, len(todo), batch_size):
             chunk = todo[start:start + batch_size]
             request = EmbedRequest(texts=[e["text"] for e in chunk], task_type="document",
-                                   model=model, dimensions=dim, api_key=api_key, timeout_s=timeout_s)
-            vectors = provider.embed(request)
+                                   model=model, dimensions=dim, api_key=api_keys[0], timeout_s=timeout_s)
+            vectors = _embed_with_rotation(provider, api_keys, request)
             for entry, vector in zip(chunk, vectors):
                 index["entries"][entry["key"]] = {
                     "section": entry["section"], "name": entry["name"], "file": entry["file"],
@@ -295,16 +327,20 @@ def cmd_search(question: str, index_path: Path, provider_name: str,
     model = model or provider.default_model
     dim = dimensions or provider.default_dimensions
 
-    api_key = _resolve_api_key(provider)
-    if not api_key:
-        print(f"Missing API key: set {provider.env_var} to use --provider {provider.name}.",
-              file=sys.stderr)
-        return 2
+    if provider.requires_api_key:
+        api_keys = _resolve_api_keys(provider)
+        if not api_keys:
+            print(f"Missing API key: set {provider.env_var} (or {provider.env_var}S for "
+                  f"multiple, comma-separated, rotated on quota) to use --provider {provider.name}.",
+                  file=sys.stderr)
+            return 2
+    else:
+        api_keys = [""]
 
     request = EmbedRequest(texts=[question], task_type="query", model=model, dimensions=dim,
-                           api_key=api_key, timeout_s=timeout_s)
+                           api_key=api_keys[0], timeout_s=timeout_s)
     try:
-        query_vector = provider.embed(request)[0]
+        query_vector = _embed_with_rotation(provider, api_keys, request)[0]
     except (QuotaExhausted, InvalidApiKey, EmbeddingError) as exc:
         print(f"\n{exc}", file=sys.stderr)
         return 2

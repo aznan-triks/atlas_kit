@@ -35,6 +35,7 @@ class EmbeddingProvider(Protocol):
     default_model: str
     default_dimensions: int
     env_var: str
+    requires_api_key: bool
 
     def embed(self, request: EmbedRequest, http_post: HttpPost | None = None) -> list[list[float]]: ...
 

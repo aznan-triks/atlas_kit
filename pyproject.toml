@@ -1,6 +1,6 @@
 [project]
 name = "atlas-kit"
-version = "0.1.0"
+version = "0.2.0"
 description = "Mechanical + optional semantic code-symbol atlas for any repository."
 readme = "README.md"
 requires-python = ">=3.10"
@@ -9,6 +9,8 @@ dependencies = ["requests>=2.31"]
 
 [project.optional-dependencies]
 dev = ["pytest>=8.0"]
+local = ["fastembed>=0.5"]
+treesitter = ["tree-sitter>=0.22", "tree-sitter-javascript>=0.21", "tree-sitter-typescript>=0.21"]
 
 [project.scripts]
 atlas-kit = "atlas_kit.cli:main"

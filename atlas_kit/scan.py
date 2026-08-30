@@ -1,37 +1,28 @@
 """Mechanical mode: walk a repository and index its code symbols. No network, no API key.
 
-Python files are parsed precisely via `ast`. Every other supported extension falls
-back to a best-effort regex scan (documented as non-exhaustive) — good enough to
-answer "does something like this already exist" without pretending to be a real
-per-language parser.
+Python files are parsed precisely via `ast`. Every other supported extension is
+dispatched through `atlas_kit.parsers` (regex fallback, or tree-sitter where
+available) — see that package for the per-language backends.
 """
 from __future__ import annotations
 
 import ast
 import fnmatch
 import hashlib
-import re
-from dataclasses import asdict, dataclass
+from dataclasses import asdict
 from pathlib import Path
+
+from atlas_kit.parsers import PARSER_MODES, resolve_parser
+from atlas_kit.parsers.regex_parser import parse_generic_file
+from atlas_kit.symbol import Symbol
 
 DEFAULT_IGNORE_DIRS = {
     ".git", "node_modules", "__pycache__", ".venv", "venv", "env",
     "dist", "build", ".mypy_cache", ".pytest_cache", ".ruff_cache",
-    "target", ".next", ".idea", ".vscode", "vendor",
+    "target", ".next", ".idea", ".vscode", "vendor", ".claude",
 }
 
 SUPPORTED_EXTENSIONS = {".py", ".js", ".jsx", ".ts", ".tsx", ".go", ".rs"}
-
-
-@dataclass
-class Symbol:
-    section: str
-    name: str
-    file: str
-    line: int
-    signature: str
-    docstring: str
-    language: str
 
 
 def should_ignore(rel_posix: str, ignore_globs: list[str]) -> bool:
@@ -96,55 +87,11 @@ def parse_python_file(path: Path, rel: str) -> list[Symbol]:
     return out
 
 
-# One (regex, section) pair per extension group. Best-effort: catches the common
-# declaration shapes, not every valid syntax variant of each language.
-_GENERIC_PATTERNS: dict[str, list[tuple[re.Pattern, str]]] = {
-    ".js": [
-        (re.compile(r"^\s*(?:export\s+)?(?:default\s+)?(?:async\s+)?function\s*\*?\s+([A-Za-z_$][\w$]*)"), "generic_functions"),
-        (re.compile(r"^\s*(?:export\s+)?class\s+([A-Za-z_$][\w$]*)"), "generic_classes"),
-    ],
-    ".go": [
-        (re.compile(r"^func\s+(?:\([^)]*\)\s*)?([A-Za-z_]\w*)\s*\("), "generic_functions"),
-    ],
-    ".rs": [
-        (re.compile(r"^\s*(?:pub\s+)?fn\s+([A-Za-z_]\w*)\s*[(<]"), "generic_functions"),
-        (re.compile(r"^\s*(?:pub\s+)?struct\s+([A-Za-z_]\w*)"), "generic_classes"),
-    ],
-}
-_GENERIC_PATTERNS[".jsx"] = _GENERIC_PATTERNS[".js"]
-_GENERIC_PATTERNS[".ts"] = _GENERIC_PATTERNS[".js"]
-_GENERIC_PATTERNS[".tsx"] = _GENERIC_PATTERNS[".js"]
-
-_LANGUAGE_BY_EXT = {
-    ".js": "javascript", ".jsx": "javascript", ".ts": "typescript", ".tsx": "typescript",
-    ".go": "go", ".rs": "rust",
-}
-
-
-def parse_generic_file(path: Path, rel: str) -> list[Symbol]:
-    patterns = _GENERIC_PATTERNS.get(path.suffix)
-    if not patterns:
-        return []
-    try:
-        lines = path.read_text(encoding="utf-8").splitlines()
-    except UnicodeDecodeError:
-        return []
-
-    out: list[Symbol] = []
-    for lineno, line in enumerate(lines, start=1):
-        for pattern, section in patterns:
-            match = pattern.match(line)
-            if match:
-                out.append(Symbol(
-                    section=section, name=match.group(1), file=rel, line=lineno,
-                    signature=line.strip(), docstring="",
-                    language=_LANGUAGE_BY_EXT[path.suffix],
-                ))
-    return out
-
-
 def build_atlas(root: Path, ignore_globs: list[str] | None = None,
-                previous: dict | None = None) -> dict:
+                previous: dict | None = None, parser_mode: str = "auto") -> dict:
+    if parser_mode not in PARSER_MODES:
+        raise ValueError(f"Unknown parser mode '{parser_mode}'. Available: {', '.join(PARSER_MODES)}")
+
     ignore_globs = ignore_globs or []
     prev_files: dict = (previous or {}).get("files", {})
     prev_symbols_by_file: dict[str, list[dict]] = {}
@@ -162,7 +109,11 @@ def build_atlas(root: Path, ignore_globs: list[str] | None = None,
         if prev_files.get(rel) == digest:
             rows = prev_symbols_by_file.get(rel, [])
         else:
-            found = parse_python_file(path, rel) if path.suffix == ".py" else parse_generic_file(path, rel)
+            if path.suffix == ".py":
+                found = parse_python_file(path, rel)
+            else:
+                parser = resolve_parser(path.suffix, parser_mode)
+                found = parser.parse(path, rel) if parser else []
             rows = [asdict(s) for s in found]
 
         for row in rows:

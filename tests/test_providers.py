@@ -28,8 +28,8 @@ def _request(**overrides):
     return EmbedRequest(**base)
 
 
-def test_registry_exposes_gemini_and_openai():
-    assert set(PROVIDERS) == {"gemini", "openai"}
+def test_registry_exposes_gemini_openai_and_local():
+    assert set(PROVIDERS) == {"gemini", "openai", "local"}
     assert isinstance(PROVIDERS["gemini"], GeminiProvider)
     assert isinstance(PROVIDERS["openai"], OpenAIProvider)
 

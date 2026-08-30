@@ -53,6 +53,54 @@ def test_embed_then_search_roundtrip(atlas_path, monkeypatch, tmp_path, capsys):
     assert "cancel_job" in out
 
 
+def test_embed_rotates_to_next_key_on_quota_exhausted(atlas_path, monkeypatch, tmp_path, capsys):
+    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+    monkeypatch.setenv("GEMINI_API_KEYS", "key-a, key-b")
+    index_path = tmp_path / "semantic_index.json"
+    calls = []
+
+    def fake_post(url, headers, json_body, timeout):
+        calls.append(headers["x-goog-api-key"])
+        if headers["x-goog-api-key"] == "key-a":
+            return _FakeResp(429, {})
+        n = len(json_body["requests"])
+        return _FakeResp(200, {"embeddings": [{"values": [1.0, 0.0]}] * n})
+
+    import atlas_kit.providers.gemini as gemini_mod
+    monkeypatch.setattr(gemini_mod, "_default_http_post", fake_post)
+
+    code = main(["embed", "--atlas", str(atlas_path), "--provider", "gemini",
+                "--index", str(index_path)])
+    err = capsys.readouterr().err
+    assert code == 0
+    assert calls == ["key-a", "key-b"]
+    # Fail Fast: rotation is printed (key identified by position, never by value).
+    assert "Key 1/2 exhausted" in err
+    assert "key-a" not in err and "key-b" not in err
+
+
+def test_embed_does_not_rotate_past_invalid_key(atlas_path, monkeypatch, tmp_path, capsys):
+    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+    monkeypatch.setenv("GEMINI_API_KEYS", "bad-key, good-key")
+    index_path = tmp_path / "semantic_index.json"
+    calls = []
+
+    def fake_post(url, headers, json_body, timeout):
+        calls.append(headers["x-goog-api-key"])
+        return _FakeResp(401, {"error": {"message": "bad key"}})
+
+    import atlas_kit.providers.gemini as gemini_mod
+    monkeypatch.setattr(gemini_mod, "_default_http_post", fake_post)
+
+    code = main(["embed", "--atlas", str(atlas_path), "--provider", "gemini",
+                "--index", str(index_path)])
+    err = capsys.readouterr().err
+    assert code != 0
+    assert "bad key" in err
+    # A bad key is a config error, not a capacity one — Fail Fast, never rotated past.
+    assert calls == ["bad-key"]
+
+
 class _FakeResp:
     def __init__(self, status_code, payload):
         self.status_code = status_code

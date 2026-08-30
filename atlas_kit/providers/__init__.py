@@ -3,11 +3,13 @@ from __future__ import annotations
 
 from .base import EmbeddingError, EmbeddingProvider, EmbedRequest, InvalidApiKey, QuotaExhausted
 from .gemini import GeminiProvider
+from .local import LocalProvider
 from .openai import OpenAIProvider
 
 PROVIDERS: dict[str, EmbeddingProvider] = {
     "gemini": GeminiProvider(),
     "openai": OpenAIProvider(),
+    "local": LocalProvider(),
 }
 
 
