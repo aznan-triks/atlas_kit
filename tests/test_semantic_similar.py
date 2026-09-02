@@ -14,7 +14,7 @@ import json
 
 from atlas_kit.cli import main
 from atlas_kit.providers.base import l2_normalize
-from atlas_kit.semantic import centroid, similar_pairs
+from atlas_kit.semantic import CURRENT_KEY_SCHEMA, centroid, similar_pairs
 
 DIM = 16
 N = 12
@@ -56,7 +56,10 @@ def _build_index(same_file: bool) -> dict:
             "section": "python_functions", "name": f"fn{i}", "file": file_, "line": 1,
             "vector": vectors[i],
         }
-    return {"model": "m", "dim": DIM, "centroid": c, "entries": entries}
+    # key_schema is mandatory for every reader since the compatibility guard landed —
+    # an index without it is schema 1 and is refused before anything else is checked.
+    return {"model": "m", "dim": DIM, "centroid": c, "key_schema": CURRENT_KEY_SCHEMA,
+            "entries": entries}
 
 
 def test_similar_pairs_finds_near_duplicate_entries():
@@ -118,7 +121,9 @@ def test_cli_similar_reports_header_with_correct_counts(tmp_path, capsys):
 
 
 def test_cli_similar_missing_centroid_fails_fast(tmp_path, capsys):
-    index = {"model": "m", "dim": 2, "entries": {
+    # Current key schema on purpose: this test is about the MISSING CENTROID guard, so
+    # the key-schema guard (which runs first) must have nothing to say here.
+    index = {"model": "m", "dim": 2, "key_schema": CURRENT_KEY_SCHEMA, "entries": {
         "a": {"section": "s", "name": "x", "file": "f.py", "line": 1, "vector": [1.0, 0.0]},
         "b": {"section": "s", "name": "y", "file": "f.py", "line": 2, "vector": [0.0, 1.0]},
     }}

@@ -7,10 +7,17 @@ from conftest import write
 
 from atlas_kit.parsers import PARSERS, resolve_parser
 from atlas_kit.parsers.regex_parser import RegexParser
+from atlas_kit.parsers import treesitter_parser as ts_module
 from atlas_kit.parsers.treesitter_parser import TREESITTER_AVAILABLE, TreeSitterParser
 from atlas_kit.scan import build_atlas
 
 needs_treesitter = pytest.mark.skipif(not TREESITTER_AVAILABLE, reason="tree-sitter extras not installed")
+
+
+def _hide_grammar(monkeypatch, extension: str) -> None:
+    """Simulate a machine without `extension`'s grammar package installed, without
+    touching the real environment (never uninstall anything from a test)."""
+    monkeypatch.delitem(ts_module._TS_LANGUAGE_BY_EXT, extension, raising=False)
 
 
 def test_resolve_parser_regex_mode_ignores_treesitter():
@@ -22,10 +29,34 @@ def test_resolve_parser_unsupported_extension_returns_none():
     assert resolve_parser(".xyz", mode="auto") is None
 
 
-def test_resolve_parser_treesitter_mode_has_no_scope_over_go():
-    # --parser treesitter only covers .js/.jsx/.ts/.tsx — Go has no second backend
-    # yet, so this must not raise, it just uses regex (the only backend for .go).
-    assert isinstance(resolve_parser(".go", mode="treesitter"), RegexParser)
+def test_resolve_parser_treesitter_mode_raises_for_missing_go_grammar(monkeypatch):
+    # Fail Fast: an explicit --parser treesitter on .go must name tree-sitter-go, never
+    # silently degrade to regex. Grammars are per-extension pip packages now.
+    _hide_grammar(monkeypatch, ".go")
+    with pytest.raises(RuntimeError, match="tree-sitter-go"):
+        resolve_parser(".go", mode="treesitter")
+
+
+def test_resolve_parser_treesitter_mode_raises_for_missing_rust_grammar(monkeypatch):
+    _hide_grammar(monkeypatch, ".rs")
+    with pytest.raises(RuntimeError, match="tree-sitter-rust"):
+        resolve_parser(".rs", mode="treesitter")
+
+
+def test_resolve_parser_auto_falls_back_to_regex_for_missing_grammar(monkeypatch):
+    # Per-extension availability: a missing .go grammar must not disable .js.
+    _hide_grammar(monkeypatch, ".go")
+    assert isinstance(resolve_parser(".go", mode="auto"), RegexParser)
+
+
+def test_resolve_parser_treesitter_mode_has_no_scope_over_unknown_extension():
+    # tree-sitter knows nothing about .py here (scan.py owns Python via ast), so the
+    # flag has no scope: no raise, just whatever else covers the extension — nothing.
+    assert resolve_parser(".py", mode="treesitter") is None
+
+
+def test_resolve_parser_regex_mode_still_serves_go():
+    assert isinstance(resolve_parser(".go", mode="regex"), RegexParser)
 
 
 def test_resolve_parser_treesitter_mode_raises_when_unavailable(monkeypatch):

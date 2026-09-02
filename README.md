@@ -2,105 +2,352 @@
 
 Mechanical + optional semantic code-symbol atlas for any repository.
 
+An inventory of every function, method and class in a repo — plus the call and import
+edges between the Python ones — built to answer one question fast and offline:
+**does this already exist here?**
+
 ## What it does
 
-- **Mode 1 — mechanical (default, zero API key ever needed):** scans a repository
-  and indexes its functions, methods and classes. Python is parsed precisely via
-  `ast`; JavaScript/TypeScript, Go and Rust get a best-effort regex fallback
-  (documented as non-exhaustive — good enough to answer "does this already exist",
-  not a full per-language parser).
-- **Mode 2 — semantic (optional, needs one API key):** turns the mechanical atlas
-  into a vector index and lets you search it by *meaning* instead of by keyword.
-  Provider is pluggable — pick Gemini or OpenAI via `--provider` / an environment
-  variable. Mode 1 works fully standalone; mode 2 is purely additive.
+- **Mode 1 — mechanical (default, zero API key ever needed):** scans a repository and
+  indexes its functions, methods and classes, plus Python call/import edges. Python is
+  parsed via `ast`; JavaScript/TypeScript, Go and Rust via tree-sitter when the grammar
+  is installed, with a documented best-effort regex fallback otherwise.
+- **Mode 2 — semantic (optional):** turns the mechanical atlas into a vector index and
+  lets you search it by *meaning* instead of by keyword. The provider is pluggable —
+  Gemini, OpenAI, or `local` which runs on-device with no key at all. Mode 1 works fully
+  standalone; mode 2 is purely additive and never a prerequisite.
 
 ## Install
 
-    pip install -e .
+    pip install -e .                        # mode 1, one dependency
+    pip install -e '.[treesitter]'          # real ASTs for JS/TS/Go/Rust
+    pip install -e '.[local]'               # on-device embeddings, no API key
+    pip install -e '.[dev]'                 # pytest
+
+## Which mode do I need?
+
+```
+Do you know roughly what the thing is called?
+├── yes ──────────────────────────► Mode 1.  atlas-kit find "<term>"
+│                                   Offline, instant, no key. Start here, always.
+└── no, only what it does
+    │
+    ├── Is your repo small enough to skim the atlas?
+    │   └── yes ──────────────────► Mode 1.  atlas-kit section python_functions
+    │                               or `find` on a few guesses. Still free.
+    │
+    └── Genuinely need "find me whatever cancels a job, whatever it's called"?
+        │
+        ├── Can you install ~100 MB of on-device model?
+        │   └── yes ──────────────► Mode 2, local provider. No key, no network, no quota.
+        │                           pip install 'atlas-kit[local]'
+        │                           atlas-kit embed --provider local
+        │
+        └── No, or you want stronger embeddings
+            └── ────────────────────► Mode 2, Gemini or OpenAI. Costs API calls.
+                                     export GEMINI_API_KEY=...
+```
+
+Short version: **mode 1 answers most questions**. Reach for mode 2 when the keyword you
+would search for is exactly what you do not know. Nothing in mode 1 degrades if mode 2
+is never set up.
+
+## What each command costs
+
+| Cost | Commands |
+|---|---|
+| **Free** — no network, no API key, no quota | `scan` `find` `section` `deps` `unused` `similar` `status` `diff` `doctor` |
+| **One embedding API call** | `embed` (one per batch of `--batch-size`, default 50) · `search` (one per query) |
+
+`similar` is free at query time but reads an index `embed` had to build first. The
+`local` provider makes even `embed` and `search` network-free.
 
 ## Mode 1 — mechanical, no API key
 
-    atlas-kit scan .                         # writes atlas.json
-    atlas-kit find "cancel a job"            # keyword search
+    atlas-kit scan .                         # writes atlas.json (incremental — only changed files are re-parsed)
+    atlas-kit find "cancel a job"            # keyword search over names, signatures, docstrings, paths
     atlas-kit section python_functions       # dump one section as JSON
+    atlas-kit deps build_atlas               # callers and callees of a symbol (Python only)
+    atlas-kit unused                         # symbols never named at a call site — a HINT, not a verdict
+    atlas-kit diff old.json atlas.json       # what changed between two snapshots
+    atlas-kit doctor                         # environment diagnostic: why isn't this working?
 
-Python is always parsed via `ast`. JS/JSX/TS/TSX, Go and Rust go through
-`--parser {auto,regex,treesitter}` (default `auto`) — see "Parsing JS/TS" below.
+### Call and import edges
 
-## Mode 2 — semantic, one API key (or none, with `local`)
+`scan` records, for Python files only, which module each file imports and which names
+each function calls. `atlas.json` carries them under `edges`:
 
-Pick a provider and export its key:
+```json
+"edges": {
+  "language": "python",
+  "imports": {"atlas_kit/scan.py": ["ast", "atlas_kit.edges", "..."]},
+  "calls": [{"file": "atlas_kit/cli.py", "caller": "cmd_find", "callee": "load_json", "line": 91}]
+}
+```
 
-| Provider | Environment variable | Default model              | API key   |
-|----------|-----------------------|-----------------------------|-----------|
-| gemini   | `GEMINI_API_KEY`      | `gemini-embedding-001`      | required  |
-| openai   | `OPENAI_API_KEY`      | `text-embedding-3-small`    | required  |
-| local    | —                     | `BAAI/bge-small-en-v1.5`    | none — runs on-device via `fastembed`, `pip install 'atlas-kit[local]'` |
+Only the **last segment** of a call target is stored (`a.b.foo()` → `"foo"`), because
+atlas symbol names are qualnames whose last segment is the bare name — that is what
+makes a match possible without full name resolution. Calls with no static name
+(`f()()`, `d["k"]()`) are dropped rather than given a synthetic callee.
+
+`atlas-kit unused` lists symbols whose name never appears as any callee. **It is a hint,
+not a verdict**: dynamic dispatch, decorators, entry points and `getattr` all make a
+live symbol look unreferenced. Dunders, `main` and `test_*` are excluded already.
+Verify before deleting anything.
+
+### Excluding files — `.atlaskitignore`
+
+Put one glob per line in `.atlaskitignore` at the scan root (`#` comments and blank
+lines are skipped). Each glob is matched exactly like an `--ignore` argument, against
+the POSIX-relative path:
+
+    generated/**
+    **/*_pb2.py
+    vendor/**
+
+`.atlaskitignore` is always a **union** with `--ignore`, never a replacement: a
+repo-wide file cannot silently re-include what a caller excluded on the command line.
+A set of common directories (`.git`, `node_modules`, `__pycache__`, `dist`, `build`,
+`target`, `vendor`, `.venv`, `.claude`, …) is skipped unconditionally.
+
+## Mode 2 — semantic
+
+| Provider | Environment variable | Default model | API key |
+|----------|-----------------------|----------------|---------|
+| gemini   | `GEMINI_API_KEY`      | `gemini-embedding-001`   | required |
+| openai   | `OPENAI_API_KEY`      | `text-embedding-3-small` | required |
+| local    | —                     | `BAAI/bge-small-en-v1.5` | none — on-device via `fastembed`, `pip install 'atlas-kit[local]'` |
 
     export GEMINI_API_KEY=...
     atlas-kit embed --provider gemini        # incremental — only new/changed entries cost a call
     atlas-kit search "cancel a running job" --provider gemini
-    atlas-kit similar                        # near-duplicate report — offline, no API key
-    atlas-kit status                         # offline — index state, no network call
+    atlas-kit similar                        # near-duplicate report — offline, no key, no quota
+    atlas-kit status                         # offline — index state
 
 Missing or invalid key, or quota exceeded: the command exits non-zero with a message
-naming the problem. There is never a silent fallback to another provider or to mode 1.
+naming the problem. **There is never a silent fallback** to another provider or to
+mode 1.
 
-**Multi-key rotation** — set `GEMINI_API_KEYS` / `OPENAI_API_KEYS` (plural, comma-separated)
-instead of the singular var to give `embed`/`search` a pool of keys. On `QuotaExhausted`
-(HTTP 429) the next key is tried automatically — printed to stderr as `Key 1/2 exhausted
-...` (position only, never the key value); an invalid key is never rotated past (Fail
-Fast — that's a config error, not a capacity one). The singular var still works as a
+**Planning the cost of an `embed` run:** `atlas-kit status` reports how many atlas
+entries are not yet indexed. That number, divided by `--batch-size`, is the number of
+API calls the next `embed` will make. It is computed offline — no dry-run flag needed.
+
+**Multi-key rotation** — set `GEMINI_API_KEYS` / `OPENAI_API_KEYS` (plural,
+comma-separated) instead of the singular variable to give `embed`/`search` a pool. On
+`QuotaExhausted` (HTTP 429) the next key is tried, printed to stderr as `Key 1/2
+exhausted …` — **by position, never by value**. An exhausted key is dropped for the rest
+of the run rather than retried on every batch. An invalid key is never rotated past:
+that is a config error, not a capacity one. The singular variable still works as a
 one-key pool.
 
-**`atlas-kit similar`** finds near-duplicate entries already sitting in the index —
-all-pairs cosine similarity, entirely offline (no network call, no API key, zero
-quota cost). Run it after `embed` to spot redundant symbols. `--section` restricts
-pairs to one section; `--exclude-same-file` drops same-file pairs (included by
-default).
+Behind a corporate proxy, `requests` honours `HTTP_PROXY` / `HTTPS_PROXY` / `NO_PROXY` —
+nothing extra to configure.
 
-**BREAKING: `--min-score` on `search` changed meaning.** It used to be an absolute
-cosine cutoff (e.g. `0.55`). It is now a z-score multiplier k, default `1.0`: a
-result is kept only if its score >= mean + k*stdev of that query's full score
-distribution. A saved script still passing the old-style value (e.g.
-`--min-score 0.55`) will behave very differently now — re-tune it. `similar` has
-its own, stricter `--min-score` default (`2.0`).
+### `--min-score` — read this before scripting it
 
-The first `atlas-kit embed` run after upgrading auto-migrates the index's internal
-key format (one-time, printed to stdout, no extra API call/quota cost) and starts
-pruning entries for symbols no longer in the atlas.
+**BREAKING (0.2.0): `--min-score` on `search` changed meaning.** It used to be an
+absolute cosine cutoff (e.g. `0.55`). It is now a **z-score multiplier k**, default
+`1.0`: a result is kept only if its score ≥ mean + k·stdev of that query's full score
+distribution. A saved script still passing an old-style value will behave very
+differently — re-tune it. `similar` has its own, stricter default (`2.0`), because
+near-duplicate detection wants precision over recall.
 
-## Parsing JS/TS — `--parser auto|regex|treesitter`
+Why relative and not absolute: measured on this corpus, two *unrelated* symbols share
+a raw cosine of ~0.7 to 0.97 before recentring — the shared-domain bias of any code
+corpus. An absolute threshold therefore discriminates nothing. A z-score does.
+
+This is also the answer to *"are scores comparable between the `local`, Gemini and
+OpenAI providers?"* — **yes, by construction.** The threshold is relative to each
+query's own distribution within one index, so it does not depend on a provider's
+absolute cosine scale. An absolute cutoff would have needed per-provider tuning.
+
+`tests/test_min_score_semantics.py` exists solely to make a silent return to absolute
+cutoff semantics impossible.
+
+The first `embed` after upgrading auto-migrates the index's internal key format
+(one-time, no API call) and prunes entries for symbols no longer in the atlas.
+
+## Machine-readable output — `--json`
+
+Every command accepts `--json` and prints exactly one object on stdout:
+
+```json
+{"command": "find", "schema_version": 1, "ok": true, "count": 2, "results": [ ... ]}
+```
+
+Failures use the same envelope — `"ok": false` with an `"error"` string, **also on
+stdout** — so a caller only ever reads one channel. The exit code still carries the
+verdict.
+
+| Command | Payload keys |
+|---|---|
+| `scan` | `root` `out` `atlas_schema_version` `files` `symbols` `edges{files_with_imports,calls}` |
+| `find` | `pattern` `count` `results[{section,name,file,line,signature,docstring}]` |
+| `section` | `name` `count` `rows[]` |
+| `deps` | `symbol` `callers[]` `callees[]` `caller_count` `callee_count` |
+| `unused` | `count` `symbols[{section,name,file,line}]` `caveat` |
+| `diff` | `old` `new` `summary{files_added,files_removed,files_changed,symbols_added,symbols_removed,symbols_moved,symbols_signature_changed}` `files{}` `symbols{}` |
+| `doctor` | `runtime` `parsers` `providers[]` `files` |
+| `embed` | `atlas` `index` `provider` `model` `dim` `entries_total` `entries_indexed` `pruned` `migrated` |
+| `search` | `question` `count` `threshold_applied` `results[{score,section,name,file,line,signature,docstring}]` |
+| `similar` | `count` `entries` `pairs_considered` `same_file_pairs` `excluded_same_file` `pairs[{score,a,b}]` |
+| `status` | `atlas{path,resources,schema_version}` `index{path,resources,model,dim,key_schema,stale}` |
+
+`schema_version` in the envelope is the *output* contract version. It is bumped only
+when an existing key changes shape; adding a key is not a break.
+
+## Exit codes
+
+| Code | Meaning |
+|---|---|
+| `0` | Success — including "no results". An empty answer is still an answer. |
+| `1` | A runtime failure the user cannot fix by passing a different flag. |
+| `2` | User arbitration required: missing/invalid/exhausted API key, missing atlas or index, or a file written by an incompatible schema version. |
+
+A `2` always names its own fix — usually `atlas-kit scan` or `atlas-kit embed`. When it
+does not, `atlas-kit doctor` will.
+
+## Parsing, per language
+
+| Language | Backend | Extracted |
+|---|---|---|
+| Python | `ast`, always, built in | functions, methods, classes, **imports, call edges** |
+| JavaScript / TypeScript | tree-sitter (optional) or regex | functions, classes, class methods, `const x = () => …` arrow functions |
+| Go | tree-sitter (optional) or regex | `func` declarations, receiver methods (named `Type.Method`), `struct` types |
+| Rust | tree-sitter (optional) or regex | `fn` items, `impl` methods (named `Type.method`), `struct`, `enum` |
 
     pip install 'atlas-kit[treesitter]'
-    atlas-kit scan . --parser treesitter     # or omit --parser: auto picks it up when installed
+    atlas-kit scan . --parser treesitter
 
-`treesitter` gives a real AST for `.js`/`.jsx`/`.ts`/`.tsx` instead of regex_parser's
-best-effort line matching — it also extracts class methods and `const x = () => ...`
-arrow functions, which the regex backend never did. `--parser` only affects those four
-extensions: Python stays `ast`, Go/Rust stay regex (no second backend exists for them
-yet). `treesitter` forces the tree-sitter backend and fails loud (non-zero exit) if the
-extra isn't installed — never a silent fallback to regex. `regex` keeps the old default
-behaviour. `auto` (the default) uses tree-sitter when installed, else regex.
+`--parser auto` (the default) picks tree-sitter **per extension** when that language's
+grammar is importable, and regex otherwise — a machine with the JS grammar but not the
+Go one behaves predictably rather than all-or-nothing. `--parser treesitter` forces it
+and **fails loud, naming the pip package to install**, if a grammar is missing: never a
+silent downgrade to regex. `--parser regex` keeps the pre-tree-sitter behaviour.
+`atlas-kit doctor` reports which backend each extension actually resolves to.
+
+The regex backend is honest best-effort line matching, not a parser: good enough to
+answer "does this exist", not a complete parse. Docstrings are only extracted for
+Python.
+
+## The `atlas.json` file
+
+```json
+{
+  "root": "...", "schema_version": 1,
+  "files": {"path/to/file.py": "<sha256>"},
+  "symbols": {"python_functions": [{"name": ..., "file": ..., "line": ..., "signature": ..., "docstring": ..., "language": ...}]},
+  "edges": {"language": "python", "imports": {...}, "calls": [...]}
+}
+```
+
+**What it contains, and does not.** Symbol names, signatures, docstrings, file paths and
+file hashes. It never stores file bodies, string literals, or any *value* from your
+source — which is why atlas-kit does not scan for secrets before indexing: a secret in a
+variable's value cannot reach the atlas. A secret in a *docstring* or a *function name*
+would, so treat `atlas.json` with the same care as the source it describes.
+
+**`schema_version` is checked by every reader**, which fails fast rather than
+half-reading a file from another version. Rebuild with `atlas-kit scan`.
+
+**`scan` is idempotent**: rescanning an unchanged tree produces a byte-identical
+`atlas.json`, edges included. This is locked by a test, because an agent loop that
+rescans on every turn must not generate git noise.
+
+**Commit it, or generate it?** Generate it. `atlas.json` is gitignored by default: it
+is derived data, it changes on every commit that touches code, and a stale committed
+copy is worse than no copy — it answers "does this exist" with yesterday's truth. `scan`
+is incremental and fast enough to run on demand. Commit it only if you have a consumer
+that cannot run `scan` itself, and then refresh it in CI, not by hand.
+
+## Using it from Python
+
+The CLI is a thin dispatch layer; every command's logic is an importable function with
+no `argparse` in the signature. Shelling out is not required:
+
+```python
+from pathlib import Path
+from atlas_kit.scan import build_atlas
+from atlas_kit.edges import callers_of, unreferenced_symbols
+from atlas_kit.diff import diff_atlases
+
+atlas = build_atlas(Path("."))
+callers_of(atlas, "process_payment")
+unreferenced_symbols(atlas)
+diff_atlases(old_atlas, atlas).summary()
+```
+
+`build_atlas`, the `edges` query helpers and `diff_atlases` are pure and I/O-free (apart
+from `build_atlas` reading the tree it is given) — no network, no global state.
+
+## Positioning — what this is not
+
+atlas-kit is a **mechanical brick**, deliberately narrow:
+
+- **Not a knowledge graph.** It records call and import edges as flat facts; it does no
+  community detection, no clustering, no embedding of the graph structure. Tools that
+  build a real graph can consume `atlas.json` — the format is documented and versioned
+  for exactly that — rather than compete with it.
+- **Not a linter.** No complexity scores, no style rules, no findings. `unused` is a
+  hint, and says so.
+- **Not a service.** One CLI, one JSON file, one runtime dependency (`requests`).
+
+Its differentiator is that mode 1 needs **no API key, no network, no optional
+dependency, and no setup beyond `pip install`**. That is a design constraint, not a
+current limitation.
 
 ## Adding a provider
 
 Implement `atlas_kit.providers.base.EmbeddingProvider` (one `embed(request, http_post)`
 method) in a new file under `atlas_kit/providers/`, then register it in
 `atlas_kit/providers/__init__.py::PROVIDERS`. `http_post` is always injectable — see
-`tests/test_providers.py` for the pattern used to keep the test suite network-free.
-Set `requires_api_key = False` for a provider that needs no key (see `providers/local.py`).
+`tests/test_providers.py` for the pattern that keeps the test suite network-free. Set
+`requires_api_key = False` for a provider that needs no key (see `providers/local.py`).
 
 ## Adding a parser backend
 
 Implement `atlas_kit.parsers.base.CodeParser` (`name`, `extensions`, `available`, one
 `parse(path, rel)` method) in a new file under `atlas_kit/parsers/`, then register it in
-`atlas_kit/parsers/__init__.py::PARSERS` and extend `resolve_parser()`'s mode handling.
+`atlas_kit/parsers/__init__.py::PARSERS`. A backend whose coverage varies per extension
+also implements `supports(extension)`.
+
+## Performance
+
+`scan` is incremental: unchanged files are never re-parsed, and their symbols and edges
+are reused verbatim from the previous atlas.
+
+`similar` is **O(n²) in indexed entries** — it compares every pair. That is fine for the
+thousands of symbols a normal repo has, and will not be for a very large monorepo. No
+cap is imposed, because no threshold has been measured on a reference repository yet;
+publishing a guessed limit would be worse than publishing none. See `ROADMAP.md`.
+
+## Versioning and deprecation
+
+Semantic versioning. Breaking changes are announced in `CHANGELOG.md`.
+
+A flag whose *meaning* changes while its *name* stays the same is the worst kind of
+break — it fails silently in existing scripts. That happened once, to `--min-score`
+(absolute cutoff → z-score multiplier), and it is documented loudly above and pinned by
+a regression test. The policy that follows from it:
+
+1. A rename gets a deprecation period: the old name keeps working and warns.
+2. A **semantic** change to an existing flag does not get one — it gets a new flag name,
+   or a major version. Silence is the failure mode being avoided.
+3. On-disk formats are versioned (`schema_version` in the atlas, `key_schema` in the
+   index) and every reader validates before trusting.
 
 ## Non-goals
 
-- No per-language parser beyond Python (`ast`), JS/TS (tree-sitter, optional) and the
-  regex-based fallback for JS/TS/Go/Rust above.
+- No per-language parser beyond Python (`ast`), and tree-sitter/regex for JS/TS/Go/Rust.
+- No call/import edges outside Python — a regex backend cannot tell a call from a
+  mention, and a confident wrong edge is worse than none.
+- Not a linter, a graph database, or a service. See "Positioning" above.
+
+## Contributing
+
+See `CONTRIBUTING.md` for the rules the code follows, `ROADMAP.md` for the verdict on
+every suggestion the project has received (including the declined ones and why), and
+`SECURITY.md` for how keys and your code are handled.
 
 ## License
 
