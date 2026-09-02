@@ -96,3 +96,50 @@ def test_embed_prunes_orphaned_entries_with_no_matching_atlas_entry(tmp_path, mo
     assert current_key in index["entries"]
     # centroid recomputed over the sole remaining (current) vector.
     assert index["centroid"] == current_vector
+
+
+def test_embed_warns_before_wiping_index_on_model_dim_mismatch(tmp_path, monkeypatch, capsys):
+    """A stored index built with a different model/dim can never be migrated (different
+    vector dimensions can't coexist) — but the reset must be announced, never silent."""
+    monkeypatch.setenv("GEMINI_API_KEY", "fake-key")
+    atlas_path, atlas = _atlas_with_one_entry(tmp_path)
+
+    def fake_post(url, headers, json_body, timeout):
+        n = len(json_body["requests"])
+        return _FakeResp(200, {"embeddings": [{"values": [1.0, 0.0, 0.0, 0.0]}] * n})
+
+    import atlas_kit.providers.gemini as gemini_mod
+    monkeypatch.setattr(gemini_mod, "_default_http_post", fake_post)
+
+    index_path = tmp_path / "semantic_index.json"
+    old_entries = {
+        "old_section::old_name::old_file.py::1": {
+            "section": "old_section", "name": "old_name", "file": "old_file.py", "line": 1,
+            "signature": "", "docstring": "", "hash": "irrelevant", "vector": [0.0, 0.0, 0.0],
+        },
+    }
+    index_path.write_text(json.dumps({
+        "model": "some-old-model", "dim": 3, "key_schema": CURRENT_KEY_SCHEMA,
+        "entries": old_entries,
+    }), encoding="utf-8")
+
+    code = cmd_embed(atlas_path, index_path, "gemini", MODEL, DIM, 50, 5.0)
+    err = capsys.readouterr().err
+    assert code == 0
+    assert "1 old vector(s) discarded" in err
+    assert "some-old-model" in err and "'test-model'" in err
+
+    index = load_json(index_path, {})
+    assert "old_section::old_name::old_file.py::1" not in index["entries"]
+    entry = iter_atlas_entries(atlas, model=MODEL, dim=DIM)[0]
+    assert entry_key(entry["section"], entry) in index["entries"]
+
+
+class _FakeResp:
+    def __init__(self, status_code, payload):
+        self.status_code = status_code
+        self._payload = payload
+        self.text = str(payload)
+
+    def json(self):
+        return self._payload

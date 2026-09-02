@@ -208,16 +208,21 @@ def _resolve_api_keys(provider) -> list[str]:
     return [single] if single else []
 
 
-def _embed_with_rotation(provider, keys: list[str], request: EmbedRequest) -> list[list[float]]:
+def _embed_with_rotation(provider, keys: list[str],
+                         request: EmbedRequest) -> tuple[list[list[float]], list[str]]:
     """Tries each key in order, rotating to the next ONLY on QuotaExhausted (HTTP 429).
     InvalidApiKey is never rotated past — Fail Fast, propagates immediately (a bad key
     is a config error, not a capacity problem another key would fix). Every rotation is
-    printed (key identified by position, never by value) — never a silent switch."""
+    printed (key identified by position, never by value) — never a silent switch.
+
+    Returns (vectors, keys_from_working_key_onward): callers doing multiple calls
+    (e.g. one per batch) must reuse the returned key list for the next call, so an
+    already-exhausted key is dropped for good instead of being retried every batch."""
     last_exc: QuotaExhausted | None = None
     for i, key in enumerate(keys, start=1):
         request.api_key = key
         try:
-            return provider.embed(request)
+            return provider.embed(request), keys[i - 1:]
         except QuotaExhausted as exc:
             last_exc = exc
             if i < len(keys):
@@ -229,6 +234,12 @@ def _embed_with_rotation(provider, keys: list[str], request: EmbedRequest) -> li
 
 def cmd_embed(atlas_path: Path, index_path: Path, provider_name: str, model: str | None,
              dimensions: int | None, batch_size: int, timeout_s: float) -> int:
+    if not atlas_path.exists():
+        print(f"Atlas not found: {atlas_path} — run `atlas-kit scan` first, or pass "
+              f"--atlas <path>. Refusing to treat a missing atlas as empty (that would "
+              f"prune the entire index as stale).", file=sys.stderr)
+        return 2
+
     provider = get_provider(provider_name)
     model = model or provider.default_model
     dim = dimensions or provider.default_dimensions
@@ -248,6 +259,10 @@ def cmd_embed(atlas_path: Path, index_path: Path, provider_name: str, model: str
     index = load_json(index_path, {"model": "", "dim": 0, "entries": {}})
 
     if index.get("model") != model or int(index.get("dim") or 0) != dim:
+        if index.get("entries"):
+            print(f"Index model/dim changed ({index.get('model')!r}/{index.get('dim')!r} -> "
+                  f"{model!r}/{dim}) — starting a fresh index, {len(index['entries'])} old "
+                  f"vector(s) discarded (incompatible dimensions).", file=sys.stderr)
         index = {"model": model, "dim": dim, "entries": {}, "key_schema": CURRENT_KEY_SCHEMA}
 
     # 1. Key migration — local, deterministic, lossless rekey; zero API calls. Every
@@ -288,7 +303,7 @@ def cmd_embed(atlas_path: Path, index_path: Path, provider_name: str, model: str
             chunk = todo[start:start + batch_size]
             request = EmbedRequest(texts=[e["text"] for e in chunk], task_type="document",
                                    model=model, dimensions=dim, api_key=api_keys[0], timeout_s=timeout_s)
-            vectors = _embed_with_rotation(provider, api_keys, request)
+            vectors, api_keys = _embed_with_rotation(provider, api_keys, request)
             for entry, vector in zip(chunk, vectors):
                 index["entries"][entry["key"]] = {
                     "section": entry["section"], "name": entry["name"], "file": entry["file"],
@@ -340,7 +355,7 @@ def cmd_search(question: str, index_path: Path, provider_name: str,
     request = EmbedRequest(texts=[question], task_type="query", model=model, dimensions=dim,
                            api_key=api_keys[0], timeout_s=timeout_s)
     try:
-        query_vector = _embed_with_rotation(provider, api_keys, request)[0]
+        query_vector = _embed_with_rotation(provider, api_keys, request)[0][0]
     except (QuotaExhausted, InvalidApiKey, EmbeddingError) as exc:
         print(f"\n{exc}", file=sys.stderr)
         return 2
@@ -426,6 +441,11 @@ def cmd_similar(index_path: Path, min_score: float, section: str | None,
 
 
 def cmd_status(atlas_path: Path, index_path: Path) -> int:
+    if not atlas_path.exists():
+        print(f"Atlas not found: {atlas_path} — run `atlas-kit scan` first, or pass "
+              f"--atlas <path>.", file=sys.stderr)
+        return 2
+
     index = load_json(index_path, {"model": "", "dim": 0, "entries": {}})
     atlas = load_json(atlas_path, {"symbols": {}})
     entries = iter_atlas_entries(atlas, model=index.get("model", ""), dim=int(index.get("dim") or 0))
