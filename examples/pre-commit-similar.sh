@@ -5,14 +5,14 @@
 #     cp examples/pre-commit-similar.sh .git/hooks/pre-commit
 #     chmod +x .git/hooks/pre-commit
 #
-# PREREQUISITE, read this first: `similar` reads an index that `atlas-kit embed` has to
+# PREREQUISITE, read this first: `similar` reads an index that `fauna-codex embed` has to
 # have built. `similar` itself is free and offline, but the hook is only useful if the
 # index is reasonably fresh — so this script refreshes it, and THAT step costs embedding
 # API calls (one per batch of 50 changed entries).
 #
 # Two ways to make that cost acceptable:
 #   1. Use the on-device provider — no key, no network, no quota:
-#          pip install 'atlas-kit[local]'
+#          pip install 'fauna-codex[local]'
 #          export ATLAS_PROVIDER=local
 #   2. Set ATLAS_SKIP_EMBED=1 to never refresh here, and re-embed on your own schedule.
 #      The hook then reports against a possibly stale index, which is fine for a
@@ -23,15 +23,15 @@ set -euo pipefail
 PROVIDER="${ATLAS_PROVIDER:-local}"
 THRESHOLD="${ATLAS_SIMILAR_MIN_SCORE:-2.0}"
 
-command -v atlas-kit >/dev/null 2>&1 || {
-    echo "atlas-kit not on PATH — skipping duplicate check." >&2
+command -v fauna-codex >/dev/null 2>&1 || {
+    echo "fauna-codex not on PATH — skipping duplicate check." >&2
     exit 0
 }
 
-atlas-kit scan . >/dev/null
+fauna-codex scan . >/dev/null
 
 if [ "${ATLAS_SKIP_EMBED:-0}" != "1" ]; then
-    if ! atlas-kit embed --provider "$PROVIDER" >/dev/null 2>&1; then
+    if ! fauna-codex embed --provider "$PROVIDER" >/dev/null 2>&1; then
         echo "atlas: embed failed (no key, no quota, or provider unavailable) — " \
              "reporting against the existing index." >&2
     fi
@@ -39,10 +39,10 @@ fi
 
 # --exclude-same-file: two helpers sitting in the same file are usually a deliberate
 # pair, not an accident. Cross-file near-duplicates are the ones worth a second look.
-OUT="$(atlas-kit similar --exclude-same-file --min-score "$THRESHOLD" --json 2>/dev/null || true)"
+OUT="$(fauna-codex similar --exclude-same-file --min-score "$THRESHOLD" --json 2>/dev/null || true)"
 
 if [ -z "$OUT" ]; then
-    echo "atlas: no semantic index yet — run 'atlas-kit embed' once to enable this check."
+    echo "atlas: no semantic index yet — run 'fauna-codex embed' once to enable this check."
     exit 0
 fi
 
@@ -55,7 +55,7 @@ if command -v jq >/dev/null 2>&1; then
         echo "atlas: no cross-file near-duplicates above threshold ${THRESHOLD}."
     fi
 else
-    atlas-kit similar --exclude-same-file --min-score "$THRESHOLD"
+    fauna-codex similar --exclude-same-file --min-score "$THRESHOLD"
 fi
 
 # Reports, never blocks: near-duplicate is a judgement call, not a rule.

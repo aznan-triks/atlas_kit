@@ -15,9 +15,9 @@ import pytest
 
 from conftest import write
 
-from atlas_kit.cli import main
-from atlas_kit.index_store import ATLAS_SCHEMA_VERSION
-from atlas_kit.semantic import (
+from fauna_codex.cli import main
+from fauna_codex.index_store import ATLAS_SCHEMA_VERSION
+from fauna_codex.semantic import (
     CURRENT_KEY_SCHEMA, cmd_embed, cmd_search, cmd_similar, cmd_status,
 )
 
@@ -41,7 +41,7 @@ def fake_gemini(monkeypatch):
         n = len(json_body["requests"])
         return _FakeResp(200, {"embeddings": [{"values": [1.0, 0.0]}] * n})
 
-    import atlas_kit.providers.gemini as gemini_mod
+    import fauna_codex.providers.gemini as gemini_mod
     monkeypatch.setattr(gemini_mod, "_default_http_post", fake_post)
 
 
@@ -258,7 +258,7 @@ def test_status_refuses_an_atlas_with_an_unreadable_schema(tmp_path, capsys):
     code = cmd_status(atlas, _write_index(tmp_path))
     err = capsys.readouterr().err
     assert code == 2
-    assert "newer atlas-kit" in err
+    assert "newer fauna-codex" in err
 
 
 def test_status_still_reports_a_missing_index(tmp_path, capsys):
@@ -297,12 +297,12 @@ def test_status_refuses_an_index_written_under_an_older_key_schema(tmp_path, cap
     assert "key schema 1" in err and "embed" in err
 
 
-def test_readers_refuse_an_index_written_by_a_newer_atlas_kit(tmp_path, capsys):
+def test_readers_refuse_an_index_written_by_a_newer_fauna_codex(tmp_path, capsys):
     index_path = _write_index(tmp_path, key_schema=CURRENT_KEY_SCHEMA + 1)
     code = cmd_similar(index_path, 1.0, None, False)
     err = capsys.readouterr().err
     assert code == 2
-    assert "newer atlas-kit" in err
+    assert "newer fauna-codex" in err
 
 
 def test_key_schema_guard_reports_as_json_when_asked(tmp_path, capsys):

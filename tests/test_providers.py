@@ -1,14 +1,14 @@
-"""Tests — atlas_kit.providers. No test touches the network: http_post is a fake."""
+"""Tests — fauna_codex.providers. No test touches the network: http_post is a fake."""
 from __future__ import annotations
 
 import math
 
 import pytest
 
-from atlas_kit.providers import PROVIDERS, get_provider
-from atlas_kit.providers.base import EmbedRequest, InvalidApiKey, QuotaExhausted
-from atlas_kit.providers.gemini import GeminiProvider
-from atlas_kit.providers.openai import OpenAIProvider
+from fauna_codex.providers import PROVIDERS, get_provider
+from fauna_codex.providers.base import EmbedRequest, InvalidApiKey, QuotaExhausted
+from fauna_codex.providers.gemini import GeminiProvider
+from fauna_codex.providers.openai import OpenAIProvider
 
 
 class FakeResponse:

@@ -41,7 +41,7 @@ def atlas_schema_error(atlas: dict, path: Path) -> str | None:
     if found == ATLAS_SCHEMA_VERSION:
         return None
     if found > ATLAS_SCHEMA_VERSION:
-        return (f"Atlas {path} was written by a newer atlas-kit (schema {found} > "
-                f"{ATLAS_SCHEMA_VERSION}) — upgrade atlas-kit, or re-run `atlas-kit scan`.")
-    return (f"Atlas {path} uses schema {found}, this atlas-kit expects "
-            f"{ATLAS_SCHEMA_VERSION} — re-run `atlas-kit scan` to rebuild it.")
+        return (f"Atlas {path} was written by a newer fauna-codex (schema {found} > "
+                f"{ATLAS_SCHEMA_VERSION}) — upgrade fauna-codex, or re-run `fauna-codex scan`.")
+    return (f"Atlas {path} uses schema {found}, this fauna-codex expects "
+            f"{ATLAS_SCHEMA_VERSION} — re-run `fauna-codex scan` to rebuild it.")

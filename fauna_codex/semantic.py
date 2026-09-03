@@ -11,10 +11,10 @@ import statistics
 import sys
 from pathlib import Path
 
-from atlas_kit import emit
-from atlas_kit.index_store import atlas_schema_error, load_json, save_json
-from atlas_kit.providers import get_provider
-from atlas_kit.providers.base import EmbedRequest, EmbeddingError, InvalidApiKey, QuotaExhausted, l2_normalize
+from fauna_codex import emit
+from fauna_codex.index_store import atlas_schema_error, load_json, save_json
+from fauna_codex.providers import get_provider
+from fauna_codex.providers.base import EmbedRequest, EmbeddingError, InvalidApiKey, QuotaExhausted, l2_normalize
 
 DEFAULT_BATCH_SIZE = 50
 DEFAULT_TOP_K = 8
@@ -111,7 +111,7 @@ def recentred_entries(index: dict) -> list[dict]:
     """
     idx_centroid = index.get("centroid")
     if not idx_centroid:
-        raise ValueError("Index predates centroid-based search — run `atlas-kit embed` to rebuild.")
+        raise ValueError("Index predates centroid-based search — run `fauna-codex embed` to rebuild.")
     out = []
     for key, row in (index.get("entries") or {}).items():
         out.append({**row, "key": key, "vector_r": recentre(row.get("vector") or [], idx_centroid)})
@@ -206,7 +206,7 @@ def index_schema_error(index: dict, path: Path) -> str | None:
     key schema was read as if it were current and every key silently mismatched.
     `cmd_embed` deliberately does NOT call this: it is the one command that can fix
     the file (it migrates the keys in place, see cmd_embed step 1), which is exactly
-    why every message here says "run `atlas-kit embed`".
+    why every message here says "run `fauna-codex embed`".
 
     An index with no entries carries no keys to misread, so it gets no verdict — a
     missing/empty index must stay reportable by `status` and must keep producing
@@ -222,10 +222,10 @@ def index_schema_error(index: dict, path: Path) -> str | None:
     if found == CURRENT_KEY_SCHEMA:
         return None
     if found > CURRENT_KEY_SCHEMA:
-        return (f"Index {path} was written by a newer atlas-kit (key schema {found} > "
-                f"{CURRENT_KEY_SCHEMA}) — upgrade atlas-kit, or re-run `atlas-kit embed`.")
-    return (f"Index {path} uses key schema {found}, this atlas-kit expects "
-            f"{CURRENT_KEY_SCHEMA} — re-run `atlas-kit embed` to rebuild it.")
+        return (f"Index {path} was written by a newer fauna-codex (key schema {found} > "
+                f"{CURRENT_KEY_SCHEMA}) — upgrade fauna-codex, or re-run `fauna-codex embed`.")
+    return (f"Index {path} uses key schema {found}, this fauna-codex expects "
+            f"{CURRENT_KEY_SCHEMA} — re-run `fauna-codex embed` to rebuild it.")
 
 
 def _resolve_api_keys(provider) -> list[str]:
@@ -269,7 +269,7 @@ def cmd_embed(atlas_path: Path, index_path: Path, provider_name: str, model: str
              dimensions: int | None, batch_size: int, timeout_s: float,
              as_json: bool = False) -> int:
     if not atlas_path.exists():
-        emit.fail("embed", f"Atlas not found: {atlas_path} — run `atlas-kit scan` first, or pass "
+        emit.fail("embed", f"Atlas not found: {atlas_path} — run `fauna-codex scan` first, or pass "
                   f"--atlas <path>. Refusing to treat a missing atlas as empty (that would "
                   f"prune the entire index as stale).", as_json)
         return 2
@@ -396,14 +396,14 @@ def cmd_search(question: str, index_path: Path, provider_name: str,
                section: str | None, timeout_s: float, as_json: bool = False) -> int:
     index = load_json(index_path, {"model": "", "dim": 0, "entries": {}})
     if not index.get("entries"):
-        emit.fail("search", "Index is empty — run `atlas-kit embed` first.", as_json)
+        emit.fail("search", "Index is empty — run `fauna-codex embed` first.", as_json)
         return 1
     schema_error = index_schema_error(index, index_path)
     if schema_error:
         emit.fail("search", schema_error, as_json)
         return 2
     if not index.get("centroid"):
-        emit.fail("search", "Index predates centroid-based search — run `atlas-kit embed` "
+        emit.fail("search", "Index predates centroid-based search — run `fauna-codex embed` "
                   "to rebuild.", as_json)
         return 2
 
@@ -493,14 +493,14 @@ def cmd_similar(index_path: Path, min_score: float, section: str | None,
     """
     index = load_json(index_path, {"model": "", "dim": 0, "entries": {}})
     if not index.get("entries"):
-        emit.fail("similar", "Index is empty — run `atlas-kit embed` first.", as_json)
+        emit.fail("similar", "Index is empty — run `fauna-codex embed` first.", as_json)
         return 1
     schema_error = index_schema_error(index, index_path)
     if schema_error:
         emit.fail("similar", schema_error, as_json)
         return 2
     if not index.get("centroid"):
-        emit.fail("similar", "Index predates centroid-based search — run `atlas-kit embed` "
+        emit.fail("similar", "Index predates centroid-based search — run `fauna-codex embed` "
                   "to rebuild.", as_json)
         return 2
 
@@ -550,7 +550,7 @@ def cmd_similar(index_path: Path, min_score: float, section: str | None,
 
 def cmd_status(atlas_path: Path, index_path: Path, as_json: bool = False) -> int:
     if not atlas_path.exists():
-        emit.fail("status", f"Atlas not found: {atlas_path} — run `atlas-kit scan` first, or "
+        emit.fail("status", f"Atlas not found: {atlas_path} — run `fauna-codex scan` first, or "
                   f"pass --atlas <path>.", as_json)
         return 2
 

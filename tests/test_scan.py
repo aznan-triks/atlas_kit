@@ -1,9 +1,9 @@
-"""Tests — atlas_kit.scan (mechanical mode, zero network, zero API key)."""
+"""Tests — fauna_codex.scan (mechanical mode, zero network, zero API key)."""
 from __future__ import annotations
 
 from conftest import write
 
-from atlas_kit.scan import build_atlas, parse_generic_file, parse_python_file, should_ignore
+from fauna_codex.scan import build_atlas, parse_generic_file, parse_python_file, should_ignore
 
 
 def test_parse_python_file_extracts_function_and_docstring(tmp_path):

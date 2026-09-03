@@ -4,7 +4,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Protocol, runtime_checkable
 
-from atlas_kit.symbol import Symbol
+from fauna_codex.symbol import Symbol
 
 
 class CodeParser(Protocol):

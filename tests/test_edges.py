@@ -1,13 +1,13 @@
-"""Tests — atlas_kit.edges (Python-only call/import edges, zero network, zero API key)."""
+"""Tests — fauna_codex.edges (Python-only call/import edges, zero network, zero API key)."""
 from __future__ import annotations
 
 import pytest
 from conftest import write
 
-from atlas_kit.edges import (
+from fauna_codex.edges import (
     callees_of, callers_of, parse_python_edges, unreferenced_symbols,
 )
-from atlas_kit.scan import build_atlas
+from fauna_codex.scan import build_atlas
 
 SAMPLE = '''
 import os

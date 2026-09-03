@@ -1,7 +1,7 @@
-"""Regression test — atlas_kit.scan.parse_generic_file + atlas_kit.semantic.entry_text
+"""Regression test — fauna_codex.scan.parse_generic_file + fauna_codex.semantic.entry_text
 on a real-shaped, mixed-language repo.
 
-Audit finding: atlas_kit's own repo has zero .js/.ts/.go/.rs files, so the
+Audit finding: fauna_codex's own repo has zero .js/.ts/.go/.rs files, so the
 generic-language parser (parse_generic_file, used for .js/.jsx/.ts/.tsx/.go/.rs)
 and semantic.entry_text() are only ever exercised by tests/test_scan.py's minimal
 synthetic single-symbol checks — never end-to-end, through build_atlas +
@@ -19,8 +19,8 @@ from __future__ import annotations
 
 from conftest import write
 
-from atlas_kit.scan import build_atlas
-from atlas_kit.semantic import iter_atlas_entries
+from fauna_codex.scan import build_atlas
+from fauna_codex.semantic import iter_atlas_entries
 
 
 def test_generic_language_entries_have_distinct_nonempty_signatures(tmp_path):

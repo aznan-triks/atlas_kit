@@ -3,11 +3,11 @@ regex_parser's best-effort line matching: catches multi-line signatures, arrow f
 assigned to a const, class methods, Go receiver methods and Rust impl methods (none of
 which regex_parser ever extracted).
 
-Optional dependency: pip install 'atlas-kit[treesitter]'. Each language grammar is its
+Optional dependency: pip install 'fauna-codex[treesitter]'. Each language grammar is its
 own pip package, so availability is PER EXTENSION, not per backend: a machine can have
 tree-sitter-javascript and not tree-sitter-go. `available` therefore only means "at least
 one grammar imported"; `supports(extension)` is the real check. Import failure is recorded,
-never acted on — the registry (atlas_kit.parsers) decides what a missing grammar means for
+never acted on — the registry (fauna_codex.parsers) decides what a missing grammar means for
 a given --parser mode, this module never falls back on its own.
 """
 from __future__ import annotations
@@ -15,7 +15,7 @@ from __future__ import annotations
 import importlib
 from pathlib import Path
 
-from atlas_kit.symbol import Symbol
+from fauna_codex.symbol import Symbol
 
 try:
     from tree_sitter import Language, Parser as _TSParser
@@ -68,7 +68,7 @@ def missing_grammar_message(extension: str) -> str:
     return (
         f"--parser treesitter requested for '{extension}' but its tree-sitter grammar "
         f"isn't installed — pip install {package} "
-        f"(or pip install 'atlas-kit[treesitter]' for every grammar)."
+        f"(or pip install 'fauna-codex[treesitter]' for every grammar)."
     )
 
 

@@ -8,7 +8,7 @@ import json
 
 import pytest
 
-from atlas_kit import emit
+from fauna_codex import emit
 
 
 def test_success_envelope_carries_command_schema_and_ok(capsys: pytest.CaptureFixture[str]) -> None:

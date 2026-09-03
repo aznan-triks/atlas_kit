@@ -1,4 +1,4 @@
-# atlas-kit
+# fauna-codex
 
 Mechanical + optional semantic code-symbol atlas for any repository.
 
@@ -28,20 +28,20 @@ edges between the Python ones — built to answer one question fast and offline:
 
 ```
 Do you know roughly what the thing is called?
-├── yes ──────────────────────────► Mode 1.  atlas-kit find "<term>"
+├── yes ──────────────────────────► Mode 1.  fauna-codex find "<term>"
 │                                   Offline, instant, no key. Start here, always.
 └── no, only what it does
     │
     ├── Is your repo small enough to skim the atlas?
-    │   └── yes ──────────────────► Mode 1.  atlas-kit section python_functions
+    │   └── yes ──────────────────► Mode 1.  fauna-codex section python_functions
     │                               or `find` on a few guesses. Still free.
     │
     └── Genuinely need "find me whatever cancels a job, whatever it's called"?
         │
         ├── Can you install ~100 MB of on-device model?
         │   └── yes ──────────────► Mode 2, local provider. No key, no network, no quota.
-        │                           pip install 'atlas-kit[local]'
-        │                           atlas-kit embed --provider local
+        │                           pip install 'fauna-codex[local]'
+        │                           fauna-codex embed --provider local
         │
         └── No, or you want stronger embeddings
             └── ────────────────────► Mode 2, Gemini or OpenAI. Costs API calls.
@@ -64,13 +64,13 @@ is never set up.
 
 ## Mode 1 — mechanical, no API key
 
-    atlas-kit scan .                         # writes atlas.json (incremental — only changed files are re-parsed)
-    atlas-kit find "cancel a job"            # keyword search over names, signatures, docstrings, paths
-    atlas-kit section python_functions       # dump one section as JSON
-    atlas-kit deps build_atlas               # callers and callees of a symbol (Python only)
-    atlas-kit unused                         # symbols never named at a call site — a HINT, not a verdict
-    atlas-kit diff old.json atlas.json       # what changed between two snapshots
-    atlas-kit doctor                         # environment diagnostic: why isn't this working?
+    fauna-codex scan .                         # writes atlas.json (incremental — only changed files are re-parsed)
+    fauna-codex find "cancel a job"            # keyword search over names, signatures, docstrings, paths
+    fauna-codex section python_functions       # dump one section as JSON
+    fauna-codex deps build_atlas               # callers and callees of a symbol (Python only)
+    fauna-codex unused                         # symbols never named at a call site — a HINT, not a verdict
+    fauna-codex diff old.json atlas.json       # what changed between two snapshots
+    fauna-codex doctor                         # environment diagnostic: why isn't this working?
 
 ### Call and import edges
 
@@ -80,8 +80,8 @@ each function calls. `atlas.json` carries them under `edges`:
 ```json
 "edges": {
   "language": "python",
-  "imports": {"atlas_kit/scan.py": ["ast", "atlas_kit.edges", "..."]},
-  "calls": [{"file": "atlas_kit/cli.py", "caller": "cmd_find", "callee": "load_json", "line": 91}]
+  "imports": {"fauna_codex/scan.py": ["ast", "fauna_codex.edges", "..."]},
+  "calls": [{"file": "fauna_codex/cli.py", "caller": "cmd_find", "callee": "load_json", "line": 91}]
 }
 ```
 
@@ -90,14 +90,14 @@ atlas symbol names are qualnames whose last segment is the bare name — that is
 makes a match possible without full name resolution. Calls with no static name
 (`f()()`, `d["k"]()`) are dropped rather than given a synthetic callee.
 
-`atlas-kit unused` lists symbols whose name never appears as any callee. **It is a hint,
+`fauna-codex unused` lists symbols whose name never appears as any callee. **It is a hint,
 not a verdict**: dynamic dispatch, decorators, entry points and `getattr` all make a
 live symbol look unreferenced. Dunders, `main` and `test_*` are excluded already.
 Verify before deleting anything.
 
-### Excluding files — `.atlaskitignore`
+### Excluding files — `.faunacodexignore`
 
-Put one glob per line in `.atlaskitignore` at the scan root (`#` comments and blank
+Put one glob per line in `.faunacodexignore` at the scan root (`#` comments and blank
 lines are skipped). Each glob is matched exactly like an `--ignore` argument, against
 the POSIX-relative path:
 
@@ -105,7 +105,7 @@ the POSIX-relative path:
     **/*_pb2.py
     vendor/**
 
-`.atlaskitignore` is always a **union** with `--ignore`, never a replacement: a
+`.faunacodexignore` is always a **union** with `--ignore`, never a replacement: a
 repo-wide file cannot silently re-include what a caller excluded on the command line.
 A set of common directories (`.git`, `node_modules`, `__pycache__`, `dist`, `build`,
 `target`, `vendor`, `.venv`, `.claude`, …) is skipped unconditionally.
@@ -116,19 +116,19 @@ A set of common directories (`.git`, `node_modules`, `__pycache__`, `dist`, `bui
 |----------|-----------------------|----------------|---------|
 | gemini   | `GEMINI_API_KEY`      | `gemini-embedding-001`   | required |
 | openai   | `OPENAI_API_KEY`      | `text-embedding-3-small` | required |
-| local    | —                     | `BAAI/bge-small-en-v1.5` | none — on-device via `fastembed`, `pip install 'atlas-kit[local]'` |
+| local    | —                     | `BAAI/bge-small-en-v1.5` | none — on-device via `fastembed`, `pip install 'fauna-codex[local]'` |
 
     export GEMINI_API_KEY=...
-    atlas-kit embed --provider gemini        # incremental — only new/changed entries cost a call
-    atlas-kit search "cancel a running job" --provider gemini
-    atlas-kit similar                        # near-duplicate report — offline, no key, no quota
-    atlas-kit status                         # offline — index state
+    fauna-codex embed --provider gemini        # incremental — only new/changed entries cost a call
+    fauna-codex search "cancel a running job" --provider gemini
+    fauna-codex similar                        # near-duplicate report — offline, no key, no quota
+    fauna-codex status                         # offline — index state
 
 Missing or invalid key, or quota exceeded: the command exits non-zero with a message
 naming the problem. **There is never a silent fallback** to another provider or to
 mode 1.
 
-**Planning the cost of an `embed` run:** `atlas-kit status` reports how many atlas
+**Planning the cost of an `embed` run:** `fauna-codex status` reports how many atlas
 entries are not yet indexed. That number, divided by `--batch-size`, is the number of
 API calls the next `embed` will make. It is computed offline — no dry-run flag needed.
 
@@ -204,8 +204,8 @@ when an existing key changes shape; adding a key is not a break.
 | `1` | A runtime failure the user cannot fix by passing a different flag. |
 | `2` | User arbitration required: missing/invalid/exhausted API key, missing atlas or index, or a file written by an incompatible schema version. |
 
-A `2` always names its own fix — usually `atlas-kit scan` or `atlas-kit embed`. When it
-does not, `atlas-kit doctor` will.
+A `2` always names its own fix — usually `fauna-codex scan` or `fauna-codex embed`. When it
+does not, `fauna-codex doctor` will.
 
 ## Parsing, per language
 
@@ -216,15 +216,15 @@ does not, `atlas-kit doctor` will.
 | Go | tree-sitter (optional) or regex | `func` declarations, receiver methods (named `Type.Method`), `struct` types |
 | Rust | tree-sitter (optional) or regex | `fn` items, `impl` methods (named `Type.method`), `struct`, `enum` |
 
-    pip install 'atlas-kit[treesitter]'
-    atlas-kit scan . --parser treesitter
+    pip install 'fauna-codex[treesitter]'
+    fauna-codex scan . --parser treesitter
 
 `--parser auto` (the default) picks tree-sitter **per extension** when that language's
 grammar is importable, and regex otherwise — a machine with the JS grammar but not the
 Go one behaves predictably rather than all-or-nothing. `--parser treesitter` forces it
 and **fails loud, naming the pip package to install**, if a grammar is missing: never a
 silent downgrade to regex. `--parser regex` keeps the pre-tree-sitter behaviour.
-`atlas-kit doctor` reports which backend each extension actually resolves to.
+`fauna-codex doctor` reports which backend each extension actually resolves to.
 
 The regex backend is honest best-effort line matching, not a parser: good enough to
 answer "does this exist", not a complete parse. Docstrings are only extracted for
@@ -243,12 +243,12 @@ Python.
 
 **What it contains, and does not.** Symbol names, signatures, docstrings, file paths and
 file hashes. It never stores file bodies, string literals, or any *value* from your
-source — which is why atlas-kit does not scan for secrets before indexing: a secret in a
+source — which is why fauna-codex does not scan for secrets before indexing: a secret in a
 variable's value cannot reach the atlas. A secret in a *docstring* or a *function name*
 would, so treat `atlas.json` with the same care as the source it describes.
 
 **`schema_version` is checked by every reader**, which fails fast rather than
-half-reading a file from another version. Rebuild with `atlas-kit scan`.
+half-reading a file from another version. Rebuild with `fauna-codex scan`.
 
 **`scan` is idempotent**: rescanning an unchanged tree produces a byte-identical
 `atlas.json`, edges included. This is locked by a test, because an agent loop that
@@ -267,9 +267,9 @@ no `argparse` in the signature. Shelling out is not required:
 
 ```python
 from pathlib import Path
-from atlas_kit.scan import build_atlas
-from atlas_kit.edges import callers_of, unreferenced_symbols
-from atlas_kit.diff import diff_atlases
+from fauna_codex.scan import build_atlas
+from fauna_codex.edges import callers_of, unreferenced_symbols
+from fauna_codex.diff import diff_atlases
 
 atlas = build_atlas(Path("."))
 callers_of(atlas, "process_payment")
@@ -282,7 +282,7 @@ from `build_atlas` reading the tree it is given) — no network, no global state
 
 ## Positioning — what this is not
 
-atlas-kit is a **mechanical brick**, deliberately narrow:
+fauna-codex is a **mechanical brick**, deliberately narrow:
 
 - **Not a knowledge graph.** It records call and import edges as flat facts; it does no
   community detection, no clustering, no embedding of the graph structure. Tools that
@@ -298,17 +298,17 @@ current limitation.
 
 ## Adding a provider
 
-Implement `atlas_kit.providers.base.EmbeddingProvider` (one `embed(request, http_post)`
-method) in a new file under `atlas_kit/providers/`, then register it in
-`atlas_kit/providers/__init__.py::PROVIDERS`. `http_post` is always injectable — see
+Implement `fauna_codex.providers.base.EmbeddingProvider` (one `embed(request, http_post)`
+method) in a new file under `fauna_codex/providers/`, then register it in
+`fauna_codex/providers/__init__.py::PROVIDERS`. `http_post` is always injectable — see
 `tests/test_providers.py` for the pattern that keeps the test suite network-free. Set
 `requires_api_key = False` for a provider that needs no key (see `providers/local.py`).
 
 ## Adding a parser backend
 
-Implement `atlas_kit.parsers.base.CodeParser` (`name`, `extensions`, `available`, one
-`parse(path, rel)` method) in a new file under `atlas_kit/parsers/`, then register it in
-`atlas_kit/parsers/__init__.py::PARSERS`. A backend whose coverage varies per extension
+Implement `fauna_codex.parsers.base.CodeParser` (`name`, `extensions`, `available`, one
+`parse(path, rel)` method) in a new file under `fauna_codex/parsers/`, then register it in
+`fauna_codex/parsers/__init__.py::PARSERS`. A backend whose coverage varies per extension
 also implements `supports(extension)`.
 
 ## Performance

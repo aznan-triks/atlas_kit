@@ -1,4 +1,4 @@
-"""Tests — atlas_kit.cli semantic subcommands (embed/search/status). Network is faked."""
+"""Tests — fauna_codex.cli semantic subcommands (embed/search/status). Network is faked."""
 from __future__ import annotations
 
 import json
@@ -7,7 +7,7 @@ import pytest
 
 from conftest import write
 
-from atlas_kit.cli import main
+from fauna_codex.cli import main
 
 
 @pytest.fixture
@@ -70,7 +70,7 @@ def test_embed_then_search_roundtrip(atlas_path, monkeypatch, tmp_path, capsys):
         n = len(json_body["requests"])
         return _FakeResp(200, {"embeddings": [{"values": [1.0, 0.0]}] * n})
 
-    import atlas_kit.providers.gemini as gemini_mod
+    import fauna_codex.providers.gemini as gemini_mod
     monkeypatch.setattr(gemini_mod, "_default_http_post", fake_post)
 
     code = main(["embed", "--atlas", str(atlas_path), "--provider", "gemini",
@@ -99,7 +99,7 @@ def test_embed_rotates_to_next_key_on_quota_exhausted(atlas_path, monkeypatch, t
         n = len(json_body["requests"])
         return _FakeResp(200, {"embeddings": [{"values": [1.0, 0.0]}] * n})
 
-    import atlas_kit.providers.gemini as gemini_mod
+    import fauna_codex.providers.gemini as gemini_mod
     monkeypatch.setattr(gemini_mod, "_default_http_post", fake_post)
 
     code = main(["embed", "--atlas", str(atlas_path), "--provider", "gemini",
@@ -122,7 +122,7 @@ def test_embed_does_not_rotate_past_invalid_key(atlas_path, monkeypatch, tmp_pat
         calls.append(headers["x-goog-api-key"])
         return _FakeResp(401, {"error": {"message": "bad key"}})
 
-    import atlas_kit.providers.gemini as gemini_mod
+    import fauna_codex.providers.gemini as gemini_mod
     monkeypatch.setattr(gemini_mod, "_default_http_post", fake_post)
 
     code = main(["embed", "--atlas", str(atlas_path), "--provider", "gemini",
@@ -156,7 +156,7 @@ def test_embed_does_not_retry_exhausted_key_on_later_batches(monkeypatch, tmp_pa
         n = len(json_body["requests"])
         return _FakeResp(200, {"embeddings": [{"values": [1.0, 0.0]}] * n})
 
-    import atlas_kit.providers.gemini as gemini_mod
+    import fauna_codex.providers.gemini as gemini_mod
     monkeypatch.setattr(gemini_mod, "_default_http_post", fake_post)
 
     code = main(["embed", "--atlas", str(atlas_path), "--provider", "gemini",

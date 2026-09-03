@@ -3,6 +3,16 @@
 All notable changes to this project are documented here.
 Format loosely follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [Unreleased]
+
+### Changed
+- **Project renamed: `atlas-kit` → `fauna-codex`.** Package `atlas_kit` → `fauna_codex`,
+  CLI entry point `atlas-kit` → `fauna-codex`, ignore file `.atlaskitignore` →
+  `.faunacodexignore`. `atlas-kit` was never published to PyPI, so this is a pre-release
+  identity fix, not a deprecation. GitHub repo renamed to
+  `github.com/aznan-triks/fauna-codex` (old URL redirects). No behavior change beyond the
+  ignore-file name.
+
 ## [0.3.0] - 2026-09-02
 
 Theme: make the atlas readable by a machine, and make it cover the relations it was

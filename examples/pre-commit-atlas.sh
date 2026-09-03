@@ -13,8 +13,8 @@
 
 set -euo pipefail
 
-command -v atlas-kit >/dev/null 2>&1 || {
-    echo "atlas-kit not on PATH — skipping atlas check." >&2
+command -v fauna-codex >/dev/null 2>&1 || {
+    echo "fauna-codex not on PATH — skipping atlas check." >&2
     exit 0
 }
 
@@ -27,18 +27,18 @@ if [ -f atlas.json ]; then
     cp atlas.json "$SNAPSHOT"
 fi
 
-atlas-kit scan . >/dev/null
+fauna-codex scan . >/dev/null
 
 if [ ! -s "$SNAPSHOT" ]; then
     echo "atlas: first scan, nothing to compare."
     exit 0
 fi
 
-DIFF_JSON="$(atlas-kit diff "$SNAPSHOT" atlas.json --json)"
+DIFF_JSON="$(fauna-codex diff "$SNAPSHOT" atlas.json --json)"
 
 # jq is optional: without it, just show the human report and stop.
 if ! command -v jq >/dev/null 2>&1; then
-    atlas-kit diff "$SNAPSHOT" atlas.json
+    fauna-codex diff "$SNAPSHOT" atlas.json
     exit 0
 fi
 

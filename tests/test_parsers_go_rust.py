@@ -10,8 +10,8 @@ pytest.importorskip("tree_sitter", reason="tree-sitter extras not installed")
 pytest.importorskip("tree_sitter_go", reason="tree-sitter-go not installed")
 pytest.importorskip("tree_sitter_rust", reason="tree-sitter-rust not installed")
 
-from atlas_kit.parsers import resolve_parser  # noqa: E402
-from atlas_kit.parsers.treesitter_parser import TreeSitterParser  # noqa: E402
+from fauna_codex.parsers import resolve_parser  # noqa: E402
+from fauna_codex.parsers.treesitter_parser import TreeSitterParser  # noqa: E402
 
 GO_SOURCE = """package widget
 

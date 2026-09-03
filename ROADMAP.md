@@ -1,6 +1,6 @@
 # Roadmap
 
-This file is the public decision record for atlas-kit. Every suggestion that has been
+This file is the public decision record for fauna-codex. Every suggestion that has been
 put to the project is listed here with a verdict, so that a declined idea is not
 re-proposed without new information, and a deferred one carries the trigger that would
 revive it.
@@ -22,7 +22,7 @@ dependency or a second way to do an existing thing here, is declined on purpose.
 
 ---
 
-## What atlas-kit is for
+## What fauna-codex is for
 
 An inventory of the symbols in a repository, answering one question fast and offline:
 *does this already exist here?* Its primary consumer today is a coding agent that must
@@ -45,31 +45,31 @@ turn it into a linter, a graph database, a service, or a platform lose.
 | 5 | Exit-code table | Documented in the README and in `--help`. |
 | 6 | Which commands cost an API call | Documented explicitly: `scan`, `find`, `section`, `deps`, `unused`, `similar`, `status`, `diff`, `doctor` are free and offline; only `embed` and `search` hit the network. |
 | 7 | Idempotent `scan` | Locked by a test: rescanning an unchanged tree produces a byte-identical `atlas.json`. No git noise in an agent loop. |
-| 8 | Documented Python API | `import atlas_kit` was already usable; it is now stated as supported, so callers stop shelling out. |
+| 8 | Documented Python API | `import fauna_codex` was already usable; it is now stated as supported, so callers stop shelling out. |
 
 ### Coverage of the code itself
 
 | # | Item | Note |
 |---|---|---|
 | 9 | **Call and import edges** | The biggest gap: the atlas had no relations. `atlas.json` now carries `edges.imports` and `edges.calls`. Python only — extracted from `ast`, not guessed. |
-| 10 | `atlas-kit deps <symbol>` | Callers and callees of a symbol. Offline. Gives the edge data a consumer, instead of shipping dead data. |
-| 11 | `atlas-kit unused` | Symbols never named at any call site. Explicitly a **hint**, not a verdict — dynamic dispatch, decorators and entry points defeat it, and the docs say so. |
+| 10 | `fauna-codex deps <symbol>` | Callers and callees of a symbol. Offline. Gives the edge data a consumer, instead of shipping dead data. |
+| 11 | `fauna-codex unused` | Symbols never named at any call site. Explicitly a **hint**, not a verdict — dynamic dispatch, decorators and entry points defeat it, and the docs say so. |
 | 12 | Go and Rust via tree-sitter | They were stuck on the regex fallback while JS/TS had a real AST. Now the same backend, with per-grammar availability so a partially installed machine degrades predictably. |
 | 13 | Per-language regression fixtures | Go and Rust get their own parsing tests. |
-| 14 | `.atlaskitignore` | Union with `--ignore`, never a replacement. Excludes vendored and generated trees that are not in `.gitignore`. |
+| 14 | `.faunacodexignore` | Union with `--ignore`, never a replacement. Excludes vendored and generated trees that are not in `.gitignore`. |
 
 ### Trust and diagnosis
 
 | # | Item | Note |
 |---|---|---|
-| 15 | `atlas-kit doctor` | Offline diagnostic: version, Python, which parser backend each extension resolves to, which grammars are missing and their pip names, providers and whether a key is configured (**count only, never a value**), atlas/index state. |
-| 16 | `atlas-kit diff old.json new.json` | Added / removed / moved / re-signatured symbols between two snapshots. A report, not a gate — a CI script gates on the `--json` counts. |
+| 15 | `fauna-codex doctor` | Offline diagnostic: version, Python, which parser backend each extension resolves to, which grammars are missing and their pip names, providers and whether a key is configured (**count only, never a value**), atlas/index state. |
+| 16 | `fauna-codex diff old.json new.json` | Added / removed / moved / re-signatured symbols between two snapshots. A report, not a gate — a CI script gates on the `--json` counts. |
 | 17 | `--min-score` non-regression test | The flag's meaning changed (absolute cosine cutoff → z-score multiplier) and nothing guarded it. A test now makes a silent return to the old semantics impossible. |
 | 18 | `--min-score` documented far more loudly | Including the answer to "are scores comparable across providers?" — see below. |
 | 19 | `--version` | Was simply missing. |
 | 20 | Richer `--help` | Examples and the exit-code table in the epilog. |
 | 21 | Windows support stated | It is the development machine; it stops being an assumption and becomes a claim. |
-| 22 | PyPI name checked | `atlas-kit` is free. (`atlas` alone is taken, but that is not the name.) |
+| 22 | PyPI name checked | `fauna-codex` is free. (`atlas` alone is taken, but that is not the name.) |
 | 23 | Semver + deprecation policy | Stated in the README, prompted by the `--min-score` break having been discovered rather than announced. |
 | 24 | `SECURITY.md`, `CONTRIBUTING.md`, this roadmap | Public repo hygiene. |
 | 25 | Agent adoption kit | `SKILL.md` and `examples/` — a ready system-prompt fragment and a pre-commit script, so adoption does not require prompt engineering per user. |
@@ -85,10 +85,10 @@ Recorded so they are not rebuilt as a second way to do the same thing.
 | Suggestion | Already covered by |
 |---|---|
 | Configurable provider timeout | `--timeout`, since before this pass. |
-| `--dry-run` for `embed` (estimate calls first) | `atlas-kit status` reports exactly how many entries are not yet indexed — that *is* the estimate, offline. |
-| `atlas-kit stats` | `status` + `doctor`. |
-| `atlas-kit version --full` | `doctor`. |
-| `atlas-kit explain <symbol>` | `find` + the new `deps`. |
+| `--dry-run` for `embed` (estimate calls first) | `fauna-codex status` reports exactly how many entries are not yet indexed — that *is* the estimate, offline. |
+| `fauna-codex stats` | `status` + `doctor`. |
+| `fauna-codex version --full` | `doctor`. |
+| `fauna-codex explain <symbol>` | `find` + the new `deps`. |
 | Scores comparable across providers | `--min-score` is a **z-score relative to the query's own score distribution**, not an absolute cosine. That is precisely what makes it provider-independent — an absolute threshold would not be. Documented instead of tested against paid providers. |
 | `.env` separation | `.env.example` is versioned; `.env` never is. |
 
@@ -112,9 +112,9 @@ Recorded so they are not rebuilt as a second way to do the same thing.
 | `similar` as a continuous CI drift scan | The pieces exist (`similar`, `--json`, the example hook). Deferred until a real repo runs it on a schedule and tells us what the report should say. |
 | Size guardrails and a published benchmark | The project has an explicit rule against publishing a threshold it has not measured. Trigger: a scan on a reference repo (Django, React) is actually run and timed. `similar` is O(n²) in index entries — documented in the README rather than capped by a guessed limit. |
 | Depth/pair cap for `similar` | Same measurement first. |
-| `atlas-kit scan --path src/x` (partial scan) | `scan <root>` already accepts a subdirectory. The real feature is *merging* a partial scan into an existing atlas, which needs a merge policy. Trigger: a monorepo user asks. |
+| `fauna-codex scan --path src/x` (partial scan) | `scan <root>` already accepts a subdirectory. The real feature is *merging* a partial scan into an existing atlas, which needs a merge policy. Trigger: a monorepo user asks. |
 | Monorepo/workspace auto-detection, per-package atlases, multi-repo federation | Same trigger. |
-| `atlaskit.toml` central config | Flags plus `.atlaskitignore` cover today's knobs. Trigger: a third persistent setting appears. |
+| `faunacodex.toml` central config | Flags plus `.faunacodexignore` cover today's knobs. Trigger: a third persistent setting appears. |
 | Shell completion | Trigger: distribution beyond `pip install -e .`. |
 | Per-symbol source hash | Would make dedup robust to line renumbering. Trigger: a real case where line drift caused a spurious re-embed. |
 | `--stdin` (scan a diff/patch) | Trigger: a pre-commit hook that must not touch the working tree. |
@@ -133,7 +133,7 @@ Recorded so they are not rebuilt as a second way to do the same thing.
 Grouped by the reason, because the reasons repeat.
 
 **It duplicates something that already exists here.**
-`--format llm` (the human output is already one compact line per hit; `--json` covers machines — a third format is a third thing to keep in sync) · `--quiet` (`--json` is the quiet mode) · `--format table` (`find` output is already tabular) · CSV export (`--json` + `jq`) · `atlas-kit clean` (deleting two files) · `atlas-kit init` (there is no config file to scaffold) · command history log (the shell has one) · structured logging (a CLI with no daemon; `--json` is the machine channel) · synonym/alias search (that is what semantic search is for) · business-domain grouping (likewise).
+`--format llm` (the human output is already one compact line per hit; `--json` covers machines — a third format is a third thing to keep in sync) · `--quiet` (`--json` is the quiet mode) · `--format table` (`find` output is already tabular) · CSV export (`--json` + `jq`) · `fauna-codex clean` (deleting two files) · `fauna-codex init` (there is no config file to scaffold) · command history log (the shell has one) · structured logging (a CLI with no daemon; `--json` is the machine channel) · synonym/alias search (that is what semantic search is for) · business-domain grouping (likewise).
 
 **Nothing to disable / already true.**
 `NO_COLOR` support (the CLI emits no ANSI colour at all) · `--no-network` strict mode (the offline commands are offline by construction and documented as such; a flag cannot make that more true) · typo suggestions on subcommands (argparse already prints the valid choices) · falsely-ignored binary files (the scanner works from an extension allowlist and never opens a binary).

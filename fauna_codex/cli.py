@@ -6,13 +6,13 @@ import json
 import sys
 from pathlib import Path
 
-from atlas_kit import emit
-from atlas_kit.diff import cmd_diff as _cmd_diff
-from atlas_kit.doctor import cmd_doctor as _cmd_doctor
-from atlas_kit.edges import callees_of, callers_of, unreferenced_symbols
-from atlas_kit.index_store import atlas_schema_error, load_json, save_json
-from atlas_kit.scan import build_atlas
-from atlas_kit.semantic import (
+from fauna_codex import emit
+from fauna_codex.diff import cmd_diff as _cmd_diff
+from fauna_codex.doctor import cmd_doctor as _cmd_doctor
+from fauna_codex.edges import callees_of, callers_of, unreferenced_symbols
+from fauna_codex.index_store import atlas_schema_error, load_json, save_json
+from fauna_codex.scan import build_atlas
+from fauna_codex.semantic import (
     DEFAULT_BATCH_SIZE, DEFAULT_MIN_ZSCORE, DEFAULT_SIMILAR_MIN_ZSCORE, DEFAULT_TIMEOUT_S,
     DEFAULT_TOP_K, cmd_embed as _cmd_embed, cmd_search as _cmd_search,
     cmd_similar as _cmd_similar, cmd_status as _cmd_status,
@@ -38,11 +38,11 @@ network cost:
   one embedding API call:     embed (one per batch of --batch-size)  search (one)
 
 examples:
-  atlas-kit scan .                          build the atlas
-  atlas-kit find "cancel a job"             keyword search, offline
-  atlas-kit deps build_atlas                who calls it, what it calls (Python)
-  atlas-kit unused --json | jq '.count'     dead-code hints, machine-readable
-  atlas-kit doctor                          why is my setup not working?
+  fauna-codex scan .                          build the atlas
+  fauna-codex find "cancel a job"             keyword search, offline
+  fauna-codex deps build_atlas                who calls it, what it calls (Python)
+  fauna-codex unused --json | jq '.count'     dead-code hints, machine-readable
+  fauna-codex doctor                          why is my setup not working?
 """
 
 
@@ -51,7 +51,7 @@ def _package_version() -> str:
     metadata, which is not an error — report it as such rather than guessing."""
     from importlib.metadata import PackageNotFoundError, version
     try:
-        return version("atlas-kit")
+        return version("fauna-codex")
     except PackageNotFoundError:
         return VERSION_FALLBACK
 
@@ -65,7 +65,7 @@ def _load_atlas(path: Path, command: str, as_json: bool) -> dict | None:
     when the truth is "nothing was even looked at".
     """
     if not path.exists():
-        emit.fail(command, f"Atlas not found: {path} — run `atlas-kit scan` first, "
+        emit.fail(command, f"Atlas not found: {path} — run `fauna-codex scan` first, "
                            f"or pass --atlas <path>.", as_json)
         return None
     atlas = load_json(path, {})
@@ -232,13 +232,13 @@ def cmd_status(args: argparse.Namespace) -> int:
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        prog="atlas-kit", epilog=EPILOG,
+        prog="fauna-codex", epilog=EPILOG,
         formatter_class=argparse.RawDescriptionHelpFormatter,
         description="Mechanical + optional semantic code-symbol atlas for any repository.",
     )
     parser.add_argument("--version", action="version",
-                        version=f"atlas-kit {_package_version()}")
-    # Carried by every subparser rather than the top-level parser, so `atlas-kit find x
+                        version=f"fauna-codex {_package_version()}")
+    # Carried by every subparser rather than the top-level parser, so `fauna-codex find x
     # --json` works — which is where a user (and an agent) naturally puts it.
     common = argparse.ArgumentParser(add_help=False)
     common.add_argument("--json", action="store_true", help=(
@@ -254,7 +254,7 @@ def build_parser() -> argparse.ArgumentParser:
     p_scan.add_argument("--out", default="atlas.json", help="Output JSON path.")
     p_scan.add_argument("--ignore", action="append", default=[], help=(
         "Glob to exclude (repeatable), matched against the POSIX-relative path. "
-        "Unioned with the globs in a .atlaskitignore file at the scan root, if present."
+        "Unioned with the globs in a .faunacodexignore file at the scan root, if present."
     ))
     p_scan.add_argument("--parser", default="auto", choices=["auto", "regex", "treesitter"], help=(
         "Backend for .js/.jsx/.ts/.tsx, .go and .rs (Python is always ast). 'auto' "

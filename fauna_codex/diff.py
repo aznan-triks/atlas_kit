@@ -20,8 +20,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Final
 
-from atlas_kit import emit
-from atlas_kit.index_store import atlas_schema_error, load_json
+from fauna_codex import emit
+from fauna_codex.index_store import atlas_schema_error, load_json
 
 COMMAND: Final = "diff"
 
@@ -202,7 +202,7 @@ def cmd_diff(old_path: Path, new_path: Path, as_json: bool = False) -> int:
     atlases: list[dict] = []
     for label, path in (("old", old_path), ("new", new_path)):
         if not path.exists():
-            emit.fail(COMMAND, f"Atlas not found ({label}): {path} — run `atlas-kit scan "
+            emit.fail(COMMAND, f"Atlas not found ({label}): {path} — run `fauna-codex scan "
                                f"--out {path}` first, or pass an existing path. Refusing to "
                                f"treat a missing atlas as empty (that would report the whole "
                                f"repository as added or removed).", as_json)

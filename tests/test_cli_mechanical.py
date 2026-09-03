@@ -1,11 +1,11 @@
-"""Tests — atlas_kit.cli, mechanical subcommands only (scan/find/section)."""
+"""Tests — fauna_codex.cli, mechanical subcommands only (scan/find/section)."""
 from __future__ import annotations
 
 import json
 
 from conftest import write
 
-from atlas_kit.cli import main
+from fauna_codex.cli import main
 
 
 def test_scan_then_find_roundtrip(tmp_path, capsys):

@@ -1,15 +1,15 @@
-"""Tests — atlas_kit.parsers (registry + regex/treesitter backends)."""
+"""Tests — fauna_codex.parsers (registry + regex/treesitter backends)."""
 from __future__ import annotations
 
 import pytest
 
 from conftest import write
 
-from atlas_kit.parsers import PARSERS, resolve_parser
-from atlas_kit.parsers.regex_parser import RegexParser
-from atlas_kit.parsers import treesitter_parser as ts_module
-from atlas_kit.parsers.treesitter_parser import TREESITTER_AVAILABLE, TreeSitterParser
-from atlas_kit.scan import build_atlas
+from fauna_codex.parsers import PARSERS, resolve_parser
+from fauna_codex.parsers.regex_parser import RegexParser
+from fauna_codex.parsers import treesitter_parser as ts_module
+from fauna_codex.parsers.treesitter_parser import TREESITTER_AVAILABLE, TreeSitterParser
+from fauna_codex.scan import build_atlas
 
 needs_treesitter = pytest.mark.skipif(not TREESITTER_AVAILABLE, reason="tree-sitter extras not installed")
 

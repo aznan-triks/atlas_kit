@@ -9,8 +9,8 @@ from __future__ import annotations
 import pytest
 from conftest import write
 
-from atlas_kit.index_store import save_json
-from atlas_kit.scan import build_atlas
+from fauna_codex.index_store import save_json
+from fauna_codex.scan import build_atlas
 
 TREE = {
     "pkg/__init__.py": "",

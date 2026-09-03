@@ -1,4 +1,4 @@
-"""Tests — atlas_kit.semantic.cmd_embed: key-schema migration and stale-entry pruning.
+"""Tests — fauna_codex.semantic.cmd_embed: key-schema migration and stale-entry pruning.
 
 Both scenarios are constructed so pending_entries() returns nothing to embed
 (the stored hash already matches), so cmd_embed never needs to make a real
@@ -10,9 +10,9 @@ import json
 
 from conftest import write
 
-from atlas_kit.index_store import load_json
-from atlas_kit.semantic import CURRENT_KEY_SCHEMA, cmd_embed, entry_key, iter_atlas_entries
-from atlas_kit.scan import build_atlas
+from fauna_codex.index_store import load_json
+from fauna_codex.semantic import CURRENT_KEY_SCHEMA, cmd_embed, entry_key, iter_atlas_entries
+from fauna_codex.scan import build_atlas
 
 MODEL = "test-model"
 DIM = 4
@@ -108,7 +108,7 @@ def test_embed_warns_before_wiping_index_on_model_dim_mismatch(tmp_path, monkeyp
         n = len(json_body["requests"])
         return _FakeResp(200, {"embeddings": [{"values": [1.0, 0.0, 0.0, 0.0]}] * n})
 
-    import atlas_kit.providers.gemini as gemini_mod
+    import fauna_codex.providers.gemini as gemini_mod
     monkeypatch.setattr(gemini_mod, "_default_http_post", fake_post)
 
     index_path = tmp_path / "semantic_index.json"

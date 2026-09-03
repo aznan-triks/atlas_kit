@@ -1,4 +1,4 @@
-"""Tests — atlas_kit.semantic.similar_pairs / cli `similar` (offline near-duplicate
+"""Tests — fauna_codex.semantic.similar_pairs / cli `similar` (offline near-duplicate
 report). No network, no API key — mirrors the fail-fast and z-score discipline
 already pinned for search() in tests/test_semantic.py.
 
@@ -12,9 +12,9 @@ from __future__ import annotations
 
 import json
 
-from atlas_kit.cli import main
-from atlas_kit.providers.base import l2_normalize
-from atlas_kit.semantic import CURRENT_KEY_SCHEMA, centroid, similar_pairs
+from fauna_codex.cli import main
+from fauna_codex.providers.base import l2_normalize
+from fauna_codex.semantic import CURRENT_KEY_SCHEMA, centroid, similar_pairs
 
 DIM = 16
 N = 12

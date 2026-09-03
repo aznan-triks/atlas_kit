@@ -1,6 +1,6 @@
-"""`doctor` — offline self-diagnostic: why might an atlas-kit command fail here?
+"""`doctor` — offline self-diagnostic: why might an fauna-codex command fail here?
 
-Answers, without a single network call or API request: which atlas-kit is running,
+Answers, without a single network call or API request: which fauna-codex is running,
 which parser backend each supported extension would really use in `auto` mode, which
 embedding providers have a key configured, and whether the atlas/index files on disk
 are readable and current.
@@ -20,19 +20,19 @@ from dataclasses import asdict, dataclass
 from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
 
-from atlas_kit import emit
-from atlas_kit.index_store import atlas_schema_error
-from atlas_kit.parsers import PARSERS, resolve_parser
-from atlas_kit.parsers.base import supports_extension
+from fauna_codex import emit
+from fauna_codex.index_store import atlas_schema_error
+from fauna_codex.parsers import PARSERS, resolve_parser
+from fauna_codex.parsers.base import supports_extension
 # Private, and deliberately so: it is the single source of truth for "which pip package
 # ships which extension's grammar". Re-deriving that table here would be a second,
 # divergent copy — the exact failure mode this diagnostic exists to catch.
-from atlas_kit.parsers.treesitter_parser import _PIP_PACKAGE_BY_EXT
-from atlas_kit.providers import PROVIDERS
-from atlas_kit.scan import SUPPORTED_EXTENSIONS
+from fauna_codex.parsers.treesitter_parser import _PIP_PACKAGE_BY_EXT
+from fauna_codex.providers import PROVIDERS
+from fauna_codex.scan import SUPPORTED_EXTENSIONS
 # Imported, not reimplemented: the plural-then-singular env-var rule must stay ONE
 # rule, or doctor would cheerfully report a key that `embed` cannot find.
-from atlas_kit.semantic import _resolve_api_keys
+from fauna_codex.semantic import _resolve_api_keys
 
 COMMAND = "doctor"
 
@@ -41,12 +41,12 @@ COMMAND = "doctor"
 # reporting "none" for the language the scanner parses best.
 _PYTHON_BACKEND = "ast (built-in)"
 
-_TREESITTER_HINT = "pip install 'atlas-kit[treesitter]'"
+_TREESITTER_HINT = "pip install 'fauna-codex[treesitter]'"
 
 
 @dataclass
 class RuntimeInfo:
-    atlas_kit_version: str
+    fauna_codex_version: str
     python_version: str
     platform: str
 
@@ -141,12 +141,12 @@ def _size_bytes(path: Path) -> int:
 
 def _collect_runtime() -> RuntimeInfo:
     try:
-        installed = version("atlas-kit")
+        installed = version("fauna-codex")
     except PackageNotFoundError:
         # Running from a source checkout without `pip install -e .` — a real and
         # common state, not an error.
         installed = "unknown (not installed)"
-    return RuntimeInfo(atlas_kit_version=installed,
+    return RuntimeInfo(fauna_codex_version=installed,
                        python_version=platform.python_version(),
                        platform=platform.platform())
 
@@ -246,11 +246,11 @@ def _collect(atlas_path: Path, index_path: Path) -> DoctorReport:
 
 
 def _print_human(report: DoctorReport) -> None:
-    print("atlas-kit doctor — offline diagnostic, no network call, no API call.")
+    print("fauna-codex doctor — offline diagnostic, no network call, no API call.")
 
     runtime = report.runtime
     print("\n-- runtime")
-    print(f"  atlas-kit : {runtime.atlas_kit_version}")
+    print(f"  fauna-codex : {runtime.fauna_codex_version}")
     print(f"  Python    : {runtime.python_version}")
     print(f"  platform  : {runtime.platform}")
 
@@ -282,9 +282,9 @@ def _print_human(report: DoctorReport) -> None:
     atlas = report.files.atlas
     print("\n-- files")
     if not atlas.exists:
-        print(f"  atlas {atlas.path}: MISSING — run `atlas-kit scan`.")
+        print(f"  atlas {atlas.path}: MISSING — run `fauna-codex scan`.")
     elif atlas.read_error:
-        print(f"  atlas {atlas.path}: {atlas.read_error} — re-run `atlas-kit scan`.")
+        print(f"  atlas {atlas.path}: {atlas.read_error} — re-run `fauna-codex scan`.")
     else:
         print(f"  atlas {atlas.path}: {atlas.size_bytes} bytes, schema "
               f"{atlas.schema_version}, {atlas.file_count} file(s), "
@@ -294,15 +294,15 @@ def _print_human(report: DoctorReport) -> None:
 
     index = report.files.index
     if not index.exists:
-        print(f"  index {index.path}: MISSING — run `atlas-kit embed` to create it.")
+        print(f"  index {index.path}: MISSING — run `fauna-codex embed` to create it.")
     elif index.read_error:
-        print(f"  index {index.path}: {index.read_error} — re-run `atlas-kit embed`.")
+        print(f"  index {index.path}: {index.read_error} — re-run `fauna-codex embed`.")
     else:
         print(f"  index {index.path}: {index.size_bytes} bytes, {index.entry_count} "
               f"entrie(s), model {index.model or '(none)'} / {index.dim or 0} dim, "
               f"key_schema {index.key_schema if index.key_schema is not None else '(none)'}")
         if not index.has_centroid:
-            print("    centroid: absent — `search`/`similar` need `atlas-kit embed` to rebuild.")
+            print("    centroid: absent — `search`/`similar` need `fauna-codex embed` to rebuild.")
         else:
             print("    centroid: present")
 

@@ -1,10 +1,10 @@
 """Mechanical mode: walk a repository and index its code symbols. No network, no API key.
 
 Python files are parsed precisely via `ast`. Every other supported extension is
-dispatched through `atlas_kit.parsers` (regex fallback, or tree-sitter where
+dispatched through `fauna_codex.parsers` (regex fallback, or tree-sitter where
 available) — see that package for the per-language backends.
 
-Call/import edges live in `atlas_kit.edges` and cover Python only; this module just
+Call/import edges live in `fauna_codex.edges` and cover Python only; this module just
 wires them into the atlas, under the same incremental-hash cache as symbols.
 """
 from __future__ import annotations
@@ -15,13 +15,13 @@ import hashlib
 from dataclasses import asdict
 from pathlib import Path
 
-from atlas_kit.edges import assemble_edges, parse_python_edges, previous_edges_by_file
-from atlas_kit.index_store import ATLAS_SCHEMA_VERSION
-from atlas_kit.parsers import PARSER_MODES, resolve_parser
-from atlas_kit.parsers.regex_parser import parse_generic_file
-from atlas_kit.symbol import Symbol
+from fauna_codex.edges import assemble_edges, parse_python_edges, previous_edges_by_file
+from fauna_codex.index_store import ATLAS_SCHEMA_VERSION
+from fauna_codex.parsers import PARSER_MODES, resolve_parser
+from fauna_codex.parsers.regex_parser import parse_generic_file
+from fauna_codex.symbol import Symbol
 
-IGNORE_FILE = ".atlaskitignore"
+IGNORE_FILE = ".faunacodexignore"
 
 DEFAULT_IGNORE_DIRS = {
     ".git", "node_modules", "__pycache__", ".venv", "venv", "env",
@@ -40,7 +40,7 @@ def should_ignore(rel_posix: str, ignore_globs: list[str]) -> bool:
 
 
 def read_ignore_file(root: Path) -> list[str]:
-    """Globs declared in `<root>/.atlaskitignore` — one per line, `#` comments and blank
+    """Globs declared in `<root>/.faunacodexignore` — one per line, `#` comments and blank
     lines skipped, each matched exactly like an `--ignore` glob.
 
     Always a UNION with `--ignore`, never a replacement: a repo-wide file must not be able

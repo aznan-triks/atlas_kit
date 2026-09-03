@@ -8,8 +8,8 @@ from pathlib import Path
 
 import pytest
 
-from atlas_kit.doctor import cmd_doctor
-from atlas_kit.index_store import ATLAS_SCHEMA_VERSION, save_json
+from fauna_codex.doctor import cmd_doctor
+from fauna_codex.index_store import ATLAS_SCHEMA_VERSION, save_json
 
 SECRET = "sk-doctor-must-never-print-this"
 SECRET_A = "sk-key-alpha-secret"
@@ -94,7 +94,7 @@ def test_missing_atlas_and_index_still_exit_zero(tmp_path, capsys, monkeypatch):
     assert cmd_doctor(tmp_path / "nope.json", tmp_path / "nada.json") == 0
     out = capsys.readouterr().out
     assert "MISSING" in out
-    assert "atlas-kit scan" in out and "atlas-kit embed" in out
+    assert "fauna-codex scan" in out and "fauna-codex embed" in out
 
 
 def test_real_atlas_and_index_are_summarised(tmp_path, capsys, monkeypatch):
@@ -133,7 +133,7 @@ def test_malformed_atlas_is_reported_not_crashed(tmp_path, capsys, monkeypatch):
 
 def test_parser_backends_cover_every_supported_extension(tmp_path, capsys, monkeypatch):
     _clear_keys(monkeypatch)
-    from atlas_kit.scan import SUPPORTED_EXTENSIONS
+    from fauna_codex.scan import SUPPORTED_EXTENSIONS
 
     assert cmd_doctor(tmp_path / "a.json", tmp_path / "i.json", as_json=True) == 0
     backends = json.loads(capsys.readouterr().out)["parsers"]["backend_by_extension"]

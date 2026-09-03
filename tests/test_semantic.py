@@ -1,8 +1,8 @@
-"""Tests — atlas_kit.semantic (index build + cosine search). No network."""
+"""Tests — fauna_codex.semantic (index build + cosine search). No network."""
 from __future__ import annotations
 
-from atlas_kit.providers.base import l2_normalize
-from atlas_kit.semantic import (
+from fauna_codex.providers.base import l2_normalize
+from fauna_codex.semantic import (
     DEFAULT_MIN_SCORE, centroid, cosine, entry_hash, iter_atlas_entries, pending_entries,
     recentre, search,
 )

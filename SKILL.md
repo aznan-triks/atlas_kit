@@ -1,9 +1,9 @@
 ---
-name: atlas-kit
+name: fauna-codex
 description: Check whether a symbol already exists in this repository before writing new code. Use before implementing any function, class or method; when asked "does X already exist", "where is X used", "what calls X"; when looking for duplicate or near-duplicate implementations; or when a change needs the list of a symbol's callers. Mechanical commands are offline and cost nothing.
 ---
 
-# atlas-kit
+# fauna-codex
 
 An inventory of every function, method and class in a repository, plus the call and
 import edges between the Python ones. It answers **"does this already exist here?"**
@@ -27,18 +27,18 @@ away under a different name.
 ## Workflow
 
 ```bash
-atlas-kit scan .                    # build/refresh atlas.json — incremental, only re-parses changed files
-atlas-kit find "cancel"             # keyword match over names, signatures, docstrings, paths
-atlas-kit deps process_payment      # who calls it, what it calls (Python only)
-atlas-kit unused                    # symbols never named at a call site — a HINT, verify before deleting
+fauna-codex scan .                    # build/refresh atlas.json — incremental, only re-parses changed files
+fauna-codex find "cancel"             # keyword match over names, signatures, docstrings, paths
+fauna-codex deps process_payment      # who calls it, what it calls (Python only)
+fauna-codex unused                    # symbols never named at a call site — a HINT, verify before deleting
 ```
 
 Then, only if a keyword search was not enough and a key is available:
 
 ```bash
-atlas-kit embed --provider local    # 'local' runs on-device, no key: pip install 'atlas-kit[local]'
-atlas-kit search "cancel a running job"
-atlas-kit similar --exclude-same-file   # near-duplicate report over the whole index
+fauna-codex embed --provider local    # 'local' runs on-device, no key: pip install 'fauna-codex[local]'
+fauna-codex search "cancel a running job"
+fauna-codex similar --exclude-same-file   # near-duplicate report over the whole index
 ```
 
 ## Machine-readable output
@@ -58,9 +58,9 @@ so you only ever have to read one channel. The exit code still carries the verdi
 |---|---|---|
 | `0` | Success, including "no results". An empty answer is an answer. | Continue. |
 | `1` | Runtime failure. | Report it; a different flag will not fix it. |
-| `2` | User arbitration needed: missing/invalid/exhausted API key, missing atlas or index, incompatible schema. | Read the `error` message — it names the exact fix (usually `atlas-kit scan` or `atlas-kit embed`). |
+| `2` | User arbitration needed: missing/invalid/exhausted API key, missing atlas or index, incompatible schema. | Read the `error` message — it names the exact fix (usually `fauna-codex scan` or `fauna-codex embed`). |
 
-`atlas-kit doctor` explains a `2` when the message is not enough: it reports versions,
+`fauna-codex doctor` explains a `2` when the message is not enough: it reports versions,
 which parser backend each file extension resolves to, which providers have a key
 configured (count only, never a value), and the state of the atlas and index files.
 

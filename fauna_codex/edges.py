@@ -7,7 +7,7 @@ That is a documented limitation, not a bug.
 Shape stored under `atlas["edges"]`:
 
     {"language": "python",
-     "imports": {"<rel/posix.py>": ["os", "atlas_kit.scan", ...]},
+     "imports": {"<rel/posix.py>": ["os", "fauna_codex.scan", ...]},
      "calls": [{"file": ..., "caller": ..., "callee": ..., "line": ...}, ...]}
 """
 from __future__ import annotations

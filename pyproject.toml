@@ -1,5 +1,5 @@
 [project]
-name = "atlas-kit"
+name = "fauna-codex"
 version = "0.3.0"
 description = "Mechanical + optional semantic code-symbol atlas for any repository."
 readme = "README.md"
@@ -13,7 +13,7 @@ local = ["fastembed>=0.5"]
 treesitter = ["tree-sitter>=0.22", "tree-sitter-javascript>=0.21", "tree-sitter-typescript>=0.21", "tree-sitter-go>=0.25", "tree-sitter-rust>=0.24"]
 
 [project.scripts]
-atlas-kit = "atlas_kit.cli:main"
+fauna-codex = "fauna_codex.cli:main"
 
 [build-system]
 requires = ["setuptools>=68"]
@@ -21,4 +21,4 @@ build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["atlas_kit*"]
+include = ["fauna_codex*"]

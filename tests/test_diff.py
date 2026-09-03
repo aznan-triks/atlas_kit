@@ -1,10 +1,10 @@
-"""Tests — atlas_kit.diff. Pure offline JSON comparison, zero network."""
+"""Tests — fauna_codex.diff. Pure offline JSON comparison, zero network."""
 from __future__ import annotations
 
 import json
 
-from atlas_kit.diff import AtlasDiff, cmd_diff, diff_atlases
-from atlas_kit.index_store import ATLAS_SCHEMA_VERSION, save_json
+from fauna_codex.diff import AtlasDiff, cmd_diff, diff_atlases
+from fauna_codex.index_store import ATLAS_SCHEMA_VERSION, save_json
 
 
 def make_atlas(files: dict[str, str] | None = None,
@@ -250,4 +250,4 @@ def test_cmd_diff_atlas_with_newer_schema_version_exits_two(tmp_path, capsys):
     payload = json.loads(capsys.readouterr().out)
     assert code == 2
     assert payload["ok"] is False
-    assert "newer atlas-kit" in payload["error"]
+    assert "newer fauna-codex" in payload["error"]
