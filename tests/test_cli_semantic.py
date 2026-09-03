@@ -1,4 +1,4 @@
-"""Tests — fauna_codex.cli semantic subcommands (embed/search/status). Network is faked."""
+"""Tests — code_fauna_codex.cli semantic subcommands (embed/search/status). Network is faked."""
 from __future__ import annotations
 
 import json
@@ -7,32 +7,32 @@ import pytest
 
 from conftest import write
 
-from fauna_codex.cli import main
+from code_fauna_codex.cli import main
 
 
 @pytest.fixture
-def atlas_path(tmp_path):
+def codex_path(tmp_path):
     write(tmp_path, "jobs.py", 'def cancel_job(job_id):\n    """Cancel a running job."""\n    pass\n')
-    path = tmp_path / "atlas.json"
+    path = tmp_path / "codex.json"
     main(["scan", str(tmp_path), "--out", str(path)])
     return path
 
 
-def test_embed_without_api_key_fails_loud(atlas_path, monkeypatch, capsys):
+def test_embed_without_api_key_fails_loud(codex_path, monkeypatch, capsys):
     monkeypatch.delenv("GEMINI_API_KEY", raising=False)
-    code = main(["embed", "--atlas", str(atlas_path), "--provider", "gemini",
+    code = main(["embed", "--codex", str(codex_path), "--provider", "gemini",
                 "--index", "unused.json"])
     err = capsys.readouterr().err
     assert code != 0
     assert "GEMINI_API_KEY" in err
 
 
-def test_embed_fails_loud_if_atlas_missing_instead_of_pruning_everything(monkeypatch, tmp_path, capsys):
-    """Regression: `embed` without a valid --atlas used to silently treat the atlas as
+def test_embed_fails_loud_if_codex_missing_instead_of_pruning_everything(monkeypatch, tmp_path, capsys):
+    """Regression: `embed` without a valid --codex used to silently treat the codex as
     empty (load_json's missing-file fallback) and prune the ENTIRE existing index as
     stale, exiting 0. It must now refuse instead of guessing."""
     monkeypatch.setenv("GEMINI_API_KEY", "fake-key")
-    missing_atlas = tmp_path / "does_not_exist.json"
+    missing_codex = tmp_path / "does_not_exist.json"
     index_path = tmp_path / "semantic_index.json"
     index_path.write_text(json.dumps({
         "model": "gemini-embedding-001", "dim": 768, "key_schema": 2,
@@ -42,25 +42,25 @@ def test_embed_fails_loud_if_atlas_missing_instead_of_pruning_everything(monkeyp
         }},
     }), encoding="utf-8")
 
-    code = main(["embed", "--atlas", str(missing_atlas), "--provider", "gemini",
+    code = main(["embed", "--codex", str(missing_codex), "--provider", "gemini",
                 "--index", str(index_path)])
     err = capsys.readouterr().err
     assert code != 0
-    assert "Atlas not found" in err
+    assert "Codex not found" in err
 
     index = json.loads(index_path.read_text(encoding="utf-8"))
     assert "python_functions::foo::mod.py::1" in index["entries"]  # untouched, not pruned
 
 
-def test_status_fails_loud_if_atlas_missing(tmp_path, capsys):
-    missing_atlas = tmp_path / "does_not_exist.json"
-    code = main(["status", "--atlas", str(missing_atlas), "--index", str(tmp_path / "idx.json")])
+def test_status_fails_loud_if_codex_missing(tmp_path, capsys):
+    missing_codex = tmp_path / "does_not_exist.json"
+    code = main(["status", "--codex", str(missing_codex), "--index", str(tmp_path / "idx.json")])
     err = capsys.readouterr().err
     assert code != 0
-    assert "Atlas not found" in err
+    assert "Codex not found" in err
 
 
-def test_embed_then_search_roundtrip(atlas_path, monkeypatch, tmp_path, capsys):
+def test_embed_then_search_roundtrip(codex_path, monkeypatch, tmp_path, capsys):
     monkeypatch.setenv("GEMINI_API_KEY", "fake-key")
     index_path = tmp_path / "semantic_index.json"
 
@@ -70,10 +70,10 @@ def test_embed_then_search_roundtrip(atlas_path, monkeypatch, tmp_path, capsys):
         n = len(json_body["requests"])
         return _FakeResp(200, {"embeddings": [{"values": [1.0, 0.0]}] * n})
 
-    import fauna_codex.providers.gemini as gemini_mod
+    import code_fauna_codex.providers.gemini as gemini_mod
     monkeypatch.setattr(gemini_mod, "_default_http_post", fake_post)
 
-    code = main(["embed", "--atlas", str(atlas_path), "--provider", "gemini",
+    code = main(["embed", "--codex", str(codex_path), "--provider", "gemini",
                 "--index", str(index_path)])
     assert code == 0
     assert index_path.exists()
@@ -86,7 +86,7 @@ def test_embed_then_search_roundtrip(atlas_path, monkeypatch, tmp_path, capsys):
     assert "cancel_job" in out
 
 
-def test_embed_rotates_to_next_key_on_quota_exhausted(atlas_path, monkeypatch, tmp_path, capsys):
+def test_embed_rotates_to_next_key_on_quota_exhausted(codex_path, monkeypatch, tmp_path, capsys):
     monkeypatch.delenv("GEMINI_API_KEY", raising=False)
     monkeypatch.setenv("GEMINI_API_KEYS", "key-a, key-b")
     index_path = tmp_path / "semantic_index.json"
@@ -99,10 +99,10 @@ def test_embed_rotates_to_next_key_on_quota_exhausted(atlas_path, monkeypatch, t
         n = len(json_body["requests"])
         return _FakeResp(200, {"embeddings": [{"values": [1.0, 0.0]}] * n})
 
-    import fauna_codex.providers.gemini as gemini_mod
+    import code_fauna_codex.providers.gemini as gemini_mod
     monkeypatch.setattr(gemini_mod, "_default_http_post", fake_post)
 
-    code = main(["embed", "--atlas", str(atlas_path), "--provider", "gemini",
+    code = main(["embed", "--codex", str(codex_path), "--provider", "gemini",
                 "--index", str(index_path)])
     err = capsys.readouterr().err
     assert code == 0
@@ -112,7 +112,7 @@ def test_embed_rotates_to_next_key_on_quota_exhausted(atlas_path, monkeypatch, t
     assert "key-a" not in err and "key-b" not in err
 
 
-def test_embed_does_not_rotate_past_invalid_key(atlas_path, monkeypatch, tmp_path, capsys):
+def test_embed_does_not_rotate_past_invalid_key(codex_path, monkeypatch, tmp_path, capsys):
     monkeypatch.delenv("GEMINI_API_KEY", raising=False)
     monkeypatch.setenv("GEMINI_API_KEYS", "bad-key, good-key")
     index_path = tmp_path / "semantic_index.json"
@@ -122,10 +122,10 @@ def test_embed_does_not_rotate_past_invalid_key(atlas_path, monkeypatch, tmp_pat
         calls.append(headers["x-goog-api-key"])
         return _FakeResp(401, {"error": {"message": "bad key"}})
 
-    import fauna_codex.providers.gemini as gemini_mod
+    import code_fauna_codex.providers.gemini as gemini_mod
     monkeypatch.setattr(gemini_mod, "_default_http_post", fake_post)
 
-    code = main(["embed", "--atlas", str(atlas_path), "--provider", "gemini",
+    code = main(["embed", "--codex", str(codex_path), "--provider", "gemini",
                 "--index", str(index_path)])
     err = capsys.readouterr().err
     assert code != 0
@@ -140,8 +140,8 @@ def test_embed_does_not_retry_exhausted_key_on_later_batches(monkeypatch, tmp_pa
     write(tmp_path, "jobs.py",
           'def cancel_job(job_id):\n    """Cancel a running job."""\n    pass\n\n'
           'def start_job(job_id):\n    """Start a job."""\n    pass\n')
-    atlas_path = tmp_path / "atlas.json"
-    main(["scan", str(tmp_path), "--out", str(atlas_path)])
+    codex_path = tmp_path / "codex.json"
+    main(["scan", str(tmp_path), "--out", str(codex_path)])
 
     monkeypatch.delenv("GEMINI_API_KEY", raising=False)
     monkeypatch.setenv("GEMINI_API_KEYS", "key-a, key-b")
@@ -156,10 +156,10 @@ def test_embed_does_not_retry_exhausted_key_on_later_batches(monkeypatch, tmp_pa
         n = len(json_body["requests"])
         return _FakeResp(200, {"embeddings": [{"values": [1.0, 0.0]}] * n})
 
-    import fauna_codex.providers.gemini as gemini_mod
+    import code_fauna_codex.providers.gemini as gemini_mod
     monkeypatch.setattr(gemini_mod, "_default_http_post", fake_post)
 
-    code = main(["embed", "--atlas", str(atlas_path), "--provider", "gemini",
+    code = main(["embed", "--codex", str(codex_path), "--provider", "gemini",
                 "--index", str(index_path), "--batch-size", "1"])
     assert code == 0
     # key-a tried exactly once (batch 1), never retried on batch 2 — sticky rotation.

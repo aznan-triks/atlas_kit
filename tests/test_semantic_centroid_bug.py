@@ -13,13 +13,13 @@ Part 1 (must PASS today): raw cosine between unrelated docs is already high,
 proving the fixed threshold can't discriminate them.
 
 Part 2 (must FAIL today, red/TDD): `centroid`/`recentre` don't exist yet in
-`fauna_codex.semantic` — this pins the contract a later phase implements
+`code_fauna_codex.semantic` — this pins the contract a later phase implements
 against. Do not implement them here.
 """
 from __future__ import annotations
 
-from fauna_codex.providers.base import l2_normalize
-from fauna_codex.semantic import DEFAULT_MIN_SCORE, cosine
+from code_fauna_codex.providers.base import l2_normalize
+from code_fauna_codex.semantic import DEFAULT_MIN_SCORE, cosine
 
 DIM = 16
 N = 12
@@ -75,14 +75,14 @@ def test_recentre_removes_shared_domain_bias():
     """Expected fix (not yet implemented): subtracting the corpus centroid
     before comparing should collapse unrelated-pair similarity toward zero.
 
-    RED on purpose -- `centroid`/`recentre` don't exist in fauna_codex.semantic
+    RED on purpose -- `centroid`/`recentre` don't exist in code_fauna_codex.semantic
     yet. This pins the contract a later phase implements:
       centroid(vectors: list[list[float]]) -> list[float]        # mean vector, NOT renormalized
       recentre(vector: list[float], centroid: list[float]) -> list[float]  # subtract centroid, then l2_normalize
     """
     vectors = _build_synthetic_vectors()
 
-    from fauna_codex.semantic import centroid, recentre  # noqa: expected to fail today (ImportError/AttributeError)
+    from code_fauna_codex.semantic import centroid, recentre  # noqa: expected to fail today (ImportError/AttributeError)
 
     c = centroid(vectors)
     for i, j in UNRELATED_PAIRS:

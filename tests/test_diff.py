@@ -1,19 +1,19 @@
-"""Tests — fauna_codex.diff. Pure offline JSON comparison, zero network."""
+"""Tests — code_fauna_codex.diff. Pure offline JSON comparison, zero network."""
 from __future__ import annotations
 
 import json
 
-from fauna_codex.diff import AtlasDiff, cmd_diff, diff_atlases
-from fauna_codex.index_store import ATLAS_SCHEMA_VERSION, save_json
+from code_fauna_codex.diff import CodexDiff, cmd_diff, diff_codexes
+from code_fauna_codex.index_store import CODEX_SCHEMA_VERSION, save_json
 
 
-def make_atlas(files: dict[str, str] | None = None,
+def make_codex(files: dict[str, str] | None = None,
                symbols: dict[str, list[dict]] | None = None,
                **extra) -> dict:
-    """Minimal well-formed atlas. `extra` lets a test bolt on unknown top-level keys."""
+    """Minimal well-formed codex. `extra` lets a test bolt on unknown top-level keys."""
     return {
         "root": "/repo",
-        "schema_version": ATLAS_SCHEMA_VERSION,
+        "schema_version": CODEX_SCHEMA_VERSION,
         "files": files if files is not None else {},
         "symbols": symbols if symbols is not None else {},
         **extra,
@@ -25,7 +25,7 @@ def symbol(name: str, file: str = "mod.py", line: int = 1, signature: str = "") 
             "signature": signature or f"def {name}()", "docstring": "", "language": "python"}
 
 
-BASE = make_atlas(
+BASE = make_codex(
     files={"mod.py": "hash-a"},
     symbols={"python_functions": [symbol("foo", line=1), symbol("bar", line=10)]},
 )
@@ -33,8 +33,8 @@ BASE = make_atlas(
 
 # --- pure comparison -------------------------------------------------------------
 
-def test_identical_atlases_report_no_change():
-    result = diff_atlases(BASE, BASE)
+def test_identical_codexes_report_no_change():
+    result = diff_codexes(BASE, BASE)
     assert result.summary() == {
         "files_added": 0, "files_removed": 0, "files_changed": 0,
         "symbols_added": 0, "symbols_removed": 0, "symbols_moved": 0,
@@ -44,9 +44,9 @@ def test_identical_atlases_report_no_change():
 
 
 def test_added_symbol():
-    new = make_atlas(files={"mod.py": "hash-a"}, symbols={"python_functions": [
+    new = make_codex(files={"mod.py": "hash-a"}, symbols={"python_functions": [
         symbol("foo", line=1), symbol("bar", line=10), symbol("baz", line=20)]})
-    result = diff_atlases(BASE, new)
+    result = diff_codexes(BASE, new)
     assert result.summary()["symbols_added"] == 1
     assert result.symbols_added[0]["name"] == "baz"
     assert result.symbols_added[0]["key"] == "python_functions::baz::mod.py"
@@ -55,18 +55,18 @@ def test_added_symbol():
 
 
 def test_removed_symbol():
-    new = make_atlas(files={"mod.py": "hash-a"},
+    new = make_codex(files={"mod.py": "hash-a"},
                      symbols={"python_functions": [symbol("foo", line=1)]})
-    result = diff_atlases(BASE, new)
+    result = diff_codexes(BASE, new)
     assert result.summary()["symbols_removed"] == 1
     assert result.symbols_removed[0]["name"] == "bar"
     assert result.symbols_added == []
 
 
 def test_moved_symbol_is_a_move_not_add_plus_remove():
-    new = make_atlas(files={"mod.py": "hash-b"}, symbols={"python_functions": [
+    new = make_codex(files={"mod.py": "hash-b"}, symbols={"python_functions": [
         symbol("foo", line=1), symbol("bar", line=42)]})
-    result = diff_atlases(BASE, new)
+    result = diff_codexes(BASE, new)
     assert result.summary()["symbols_moved"] == 1
     assert result.summary()["symbols_added"] == 0
     assert result.summary()["symbols_removed"] == 0
@@ -76,9 +76,9 @@ def test_moved_symbol_is_a_move_not_add_plus_remove():
 
 
 def test_signature_change_at_same_line():
-    new = make_atlas(files={"mod.py": "hash-b"}, symbols={"python_functions": [
+    new = make_codex(files={"mod.py": "hash-b"}, symbols={"python_functions": [
         symbol("foo", line=1), symbol("bar", line=10, signature="def bar(x, y)")]})
-    result = diff_atlases(BASE, new)
+    result = diff_codexes(BASE, new)
     assert result.summary()["symbols_signature_changed"] == 1
     assert result.summary()["symbols_moved"] == 0
     changed = result.symbols_signature_changed[0]
@@ -87,34 +87,34 @@ def test_signature_change_at_same_line():
 
 
 def test_symbol_moved_and_resigned_is_reported_in_both_categories():
-    new = make_atlas(files={"mod.py": "hash-b"}, symbols={"python_functions": [
+    new = make_codex(files={"mod.py": "hash-b"}, symbols={"python_functions": [
         symbol("foo", line=1), symbol("bar", line=99, signature="def bar(z)")]})
-    result = diff_atlases(BASE, new)
+    result = diff_codexes(BASE, new)
     assert result.summary()["symbols_moved"] == 1
     assert result.summary()["symbols_signature_changed"] == 1
 
 
 def test_same_name_in_two_files_are_two_distinct_symbols():
-    new = make_atlas(files={"mod.py": "hash-a", "other.py": "hash-c"},
+    new = make_codex(files={"mod.py": "hash-a", "other.py": "hash-c"},
                      symbols={"python_functions": [
                          symbol("foo", line=1), symbol("bar", line=10),
                          symbol("foo", file="other.py", line=3)]})
-    result = diff_atlases(BASE, new)
+    result = diff_codexes(BASE, new)
     assert result.summary()["symbols_added"] == 1
     assert result.symbols_added[0]["file"] == "other.py"
 
 
 def test_changed_file_hash():
-    new = make_atlas(files={"mod.py": "hash-CHANGED"}, symbols=BASE["symbols"])
-    result = diff_atlases(BASE, new)
+    new = make_codex(files={"mod.py": "hash-CHANGED"}, symbols=BASE["symbols"])
+    result = diff_codexes(BASE, new)
     assert result.files_changed == ["mod.py"]
     assert result.files_added == []
     assert result.files_removed == []
 
 
 def test_added_and_removed_files():
-    new = make_atlas(files={"other.py": "hash-c"}, symbols={})
-    result = diff_atlases(BASE, new)
+    new = make_codex(files={"other.py": "hash-c"}, symbols={})
+    result = diff_codexes(BASE, new)
     assert result.files_added == ["other.py"]
     assert result.files_removed == ["mod.py"]
     assert result.files_changed == []
@@ -122,21 +122,21 @@ def test_added_and_removed_files():
 
 def test_unknown_top_level_keys_are_ignored():
     """Another agent adds `edges`; diff must work with or without it."""
-    old = make_atlas(files={"mod.py": "hash-a"}, symbols=BASE["symbols"],
+    old = make_codex(files={"mod.py": "hash-a"}, symbols=BASE["symbols"],
                      edges=[{"from": "a", "to": "b"}], future_key=123)
-    new = make_atlas(files={"mod.py": "hash-a"}, symbols=BASE["symbols"],
+    new = make_codex(files={"mod.py": "hash-a"}, symbols=BASE["symbols"],
                      edges=[{"from": "x", "to": "y"}])
-    assert diff_atlases(old, new).total_changes == 0
+    assert diff_codexes(old, new).total_changes == 0
 
 
 def test_missing_files_or_symbols_keys_do_not_crash():
-    result = diff_atlases({"schema_version": ATLAS_SCHEMA_VERSION}, BASE)
+    result = diff_codexes({"schema_version": CODEX_SCHEMA_VERSION}, BASE)
     assert result.summary()["files_added"] == 1
     assert result.summary()["symbols_added"] == 2
 
 
 def test_empty_diff_dataclass_defaults():
-    assert AtlasDiff().total_changes == 0
+    assert CodexDiff().total_changes == 0
 
 
 # --- cmd_diff: exit codes, human output, JSON envelope ---------------------------
@@ -158,7 +158,7 @@ def test_cmd_diff_identical_exits_zero_and_says_no_differences(tmp_path, capsys)
 
 def test_cmd_diff_with_differences_still_exits_zero(tmp_path, capsys):
     """diff is a report, not a gate: differences must not change the exit code."""
-    new = make_atlas(files={"mod.py": "hash-b"},
+    new = make_codex(files={"mod.py": "hash-b"},
                      symbols={"python_functions": [symbol("foo", line=1)]})
     old_path, new_path = _write_pair(tmp_path, BASE, new)
     code = cmd_diff(old_path, new_path)
@@ -169,7 +169,7 @@ def test_cmd_diff_with_differences_still_exits_zero(tmp_path, capsys):
 
 
 def test_cmd_diff_json_envelope_and_summary(tmp_path, capsys):
-    new = make_atlas(files={"mod.py": "hash-b", "new.py": "hash-n"},
+    new = make_codex(files={"mod.py": "hash-b", "new.py": "hash-n"},
                      symbols={"python_functions": [
                          symbol("foo", line=1),
                          symbol("bar", line=11, signature="def bar(x)")]})
@@ -195,7 +195,7 @@ def test_cmd_diff_json_envelope_and_summary(tmp_path, capsys):
 def test_cmd_diff_json_payload_is_never_truncated(tmp_path, capsys):
     """Human output is capped per group; the JSON lists always carry everything."""
     many = {"python_functions": [symbol(f"f{i}", line=i + 1) for i in range(60)]}
-    old_path, new_path = _write_pair(tmp_path, make_atlas(), make_atlas(symbols=many))
+    old_path, new_path = _write_pair(tmp_path, make_codex(), make_codex(symbols=many))
 
     cmd_diff(old_path, new_path)
     human = capsys.readouterr().out
@@ -230,7 +230,7 @@ def test_cmd_diff_missing_new_path_exits_two_and_names_it(tmp_path, capsys):
     assert "absent_new.json" in payload["error"]
 
 
-def test_cmd_diff_atlas_without_schema_version_exits_two(tmp_path, capsys):
+def test_cmd_diff_codex_without_schema_version_exits_two(tmp_path, capsys):
     legacy = {"root": "/repo", "files": {"mod.py": "hash-a"}, "symbols": {}}
     old_path, new_path = _write_pair(tmp_path, legacy, BASE)
 
@@ -241,13 +241,13 @@ def test_cmd_diff_atlas_without_schema_version_exits_two(tmp_path, capsys):
     assert "scan" in captured.err
 
 
-def test_cmd_diff_atlas_with_newer_schema_version_exits_two(tmp_path, capsys):
-    future = make_atlas()
-    future["schema_version"] = ATLAS_SCHEMA_VERSION + 99
+def test_cmd_diff_codex_with_newer_schema_version_exits_two(tmp_path, capsys):
+    future = make_codex()
+    future["schema_version"] = CODEX_SCHEMA_VERSION + 99
     old_path, new_path = _write_pair(tmp_path, BASE, future)
 
     code = cmd_diff(old_path, new_path, as_json=True)
     payload = json.loads(capsys.readouterr().out)
     assert code == 2
     assert payload["ok"] is False
-    assert "newer fauna-codex" in payload["error"]
+    assert "newer code-fauna-codex" in payload["error"]

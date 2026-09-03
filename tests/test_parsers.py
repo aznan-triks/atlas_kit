@@ -1,15 +1,15 @@
-"""Tests — fauna_codex.parsers (registry + regex/treesitter backends)."""
+"""Tests — code_fauna_codex.parsers (registry + regex/treesitter backends)."""
 from __future__ import annotations
 
 import pytest
 
 from conftest import write
 
-from fauna_codex.parsers import PARSERS, resolve_parser
-from fauna_codex.parsers.regex_parser import RegexParser
-from fauna_codex.parsers import treesitter_parser as ts_module
-from fauna_codex.parsers.treesitter_parser import TREESITTER_AVAILABLE, TreeSitterParser
-from fauna_codex.scan import build_atlas
+from code_fauna_codex.parsers import PARSERS, resolve_parser
+from code_fauna_codex.parsers.regex_parser import RegexParser
+from code_fauna_codex.parsers import treesitter_parser as ts_module
+from code_fauna_codex.parsers.treesitter_parser import TREESITTER_AVAILABLE, TreeSitterParser
+from code_fauna_codex.scan import build_codex
 
 needs_treesitter = pytest.mark.skipif(not TREESITTER_AVAILABLE, reason="tree-sitter extras not installed")
 
@@ -65,9 +65,9 @@ def test_resolve_parser_treesitter_mode_raises_when_unavailable(monkeypatch):
         resolve_parser(".js", mode="treesitter")
 
 
-def test_build_atlas_unknown_parser_mode_raises(tmp_path):
+def test_build_codex_unknown_parser_mode_raises(tmp_path):
     with pytest.raises(ValueError, match="Unknown parser mode"):
-        build_atlas(tmp_path, parser_mode="bogus")
+        build_codex(tmp_path, parser_mode="bogus")
 
 
 @needs_treesitter
@@ -119,17 +119,17 @@ def test_treesitter_parser_raises_when_unavailable(monkeypatch, tmp_path):
         parser.parse(tmp_path / "mod.js", "mod.js")
 
 
-def test_build_atlas_parser_mode_regex_never_extracts_js_methods(tmp_path):
+def test_build_codex_parser_mode_regex_never_extracts_js_methods(tmp_path):
     write(tmp_path, "mod.js", "class Widget {\n  render() {}\n}\n")
-    atlas = build_atlas(tmp_path, parser_mode="regex")
-    sections = {section for section, rows in atlas["symbols"].items() if rows}
+    codex = build_codex(tmp_path, parser_mode="regex")
+    sections = {section for section, rows in codex["symbols"].items() if rows}
     assert "generic_classes" in sections
     assert "generic_methods" not in sections  # regex_parser never extracted JS methods
 
 
 @needs_treesitter
-def test_build_atlas_parser_mode_auto_extracts_js_methods(tmp_path):
+def test_build_codex_parser_mode_auto_extracts_js_methods(tmp_path):
     write(tmp_path, "mod.js", "class Widget {\n  render() {}\n}\n")
-    atlas = build_atlas(tmp_path, parser_mode="auto")
-    names = {(section, s["name"]) for section, rows in atlas["symbols"].items() for s in rows}
+    codex = build_codex(tmp_path, parser_mode="auto")
+    names = {(section, s["name"]) for section, rows in codex["symbols"].items() for s in rows}
     assert ("generic_methods", "Widget.render") in names

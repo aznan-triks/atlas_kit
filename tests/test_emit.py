@@ -8,7 +8,7 @@ import json
 
 import pytest
 
-from fauna_codex import emit
+from code_fauna_codex import emit
 
 
 def test_success_envelope_carries_command_schema_and_ok(capsys: pytest.CaptureFixture[str]) -> None:
@@ -23,12 +23,12 @@ def test_success_envelope_carries_command_schema_and_ok(capsys: pytest.CaptureFi
 
 
 def test_error_envelope_is_ok_false_with_error_on_stdout(capsys: pytest.CaptureFixture[str]) -> None:
-    emit.json_error("embed", "Atlas not found: atlas.json")
+    emit.json_error("embed", "Codex not found: codex.json")
     captured = capsys.readouterr()
     payload = json.loads(captured.out)
 
     assert payload["ok"] is False
-    assert payload["error"] == "Atlas not found: atlas.json"
+    assert payload["error"] == "Codex not found: codex.json"
     # An agent must only have to read one channel.
     assert captured.err == ""
 

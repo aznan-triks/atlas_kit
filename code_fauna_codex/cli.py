@@ -6,13 +6,13 @@ import json
 import sys
 from pathlib import Path
 
-from fauna_codex import emit
-from fauna_codex.diff import cmd_diff as _cmd_diff
-from fauna_codex.doctor import cmd_doctor as _cmd_doctor
-from fauna_codex.edges import callees_of, callers_of, unreferenced_symbols
-from fauna_codex.index_store import atlas_schema_error, load_json, save_json
-from fauna_codex.scan import build_atlas
-from fauna_codex.semantic import (
+from code_fauna_codex import emit
+from code_fauna_codex.diff import cmd_diff as _cmd_diff
+from code_fauna_codex.doctor import cmd_doctor as _cmd_doctor
+from code_fauna_codex.edges import callees_of, callers_of, unreferenced_symbols
+from code_fauna_codex.index_store import codex_schema_error, load_json, save_json
+from code_fauna_codex.scan import build_codex
+from code_fauna_codex.semantic import (
     DEFAULT_BATCH_SIZE, DEFAULT_MIN_ZSCORE, DEFAULT_SIMILAR_MIN_ZSCORE, DEFAULT_TIMEOUT_S,
     DEFAULT_TOP_K, cmd_embed as _cmd_embed, cmd_search as _cmd_search,
     cmd_similar as _cmd_similar, cmd_status as _cmd_status,
@@ -20,7 +20,7 @@ from fauna_codex.semantic import (
 
 EXIT_OK = 0
 EXIT_ERROR = 1
-EXIT_NEEDS_USER = 2  # missing/invalid/exhausted API key, or an unusable atlas/index —
+EXIT_NEEDS_USER = 2  # missing/invalid/exhausted API key, or an unusable codex/index —
                      # anything the user must arbitrate before the command can mean anything
 
 VERSION_FALLBACK = "unknown (not installed — running from a source tree?)"
@@ -29,7 +29,7 @@ EPILOG = """\
 exit codes:
   0  success (including "no results" — an empty answer is still an answer)
   1  a runtime failure the user cannot fix by passing a different flag
-  2  user arbitration required: missing/invalid/exhausted API key, missing atlas or
+  2  user arbitration required: missing/invalid/exhausted API key, missing codex or
      index, or a file written by an incompatible schema version
 
 network cost:
@@ -38,11 +38,11 @@ network cost:
   one embedding API call:     embed (one per batch of --batch-size)  search (one)
 
 examples:
-  fauna-codex scan .                          build the atlas
-  fauna-codex find "cancel a job"             keyword search, offline
-  fauna-codex deps build_atlas                who calls it, what it calls (Python)
-  fauna-codex unused --json | jq '.count'     dead-code hints, machine-readable
-  fauna-codex doctor                          why is my setup not working?
+  code-fauna-codex scan .                          build the codex
+  code-fauna-codex find "cancel a job"             keyword search, offline
+  code-fauna-codex deps build_codex                who calls it, what it calls (Python)
+  code-fauna-codex unused --json | jq '.count'     dead-code hints, machine-readable
+  code-fauna-codex doctor                          why is my setup not working?
 """
 
 
@@ -51,29 +51,29 @@ def _package_version() -> str:
     metadata, which is not an error — report it as such rather than guessing."""
     from importlib.metadata import PackageNotFoundError, version
     try:
-        return version("fauna-codex")
+        return version("code-fauna-codex")
     except PackageNotFoundError:
         return VERSION_FALLBACK
 
 
-def _load_atlas(path: Path, command: str, as_json: bool) -> dict | None:
-    """Load an atlas, or report why it cannot be trusted and return None.
+def _load_codex(path: Path, command: str, as_json: bool) -> dict | None:
+    """Load a codex, or report why it cannot be trusted and return None.
 
-    Fail Fast, shared by every mechanical reader: a missing atlas is NOT an empty
-    atlas, and an atlas from another schema is NOT silently half-read. Both used to
+    Fail Fast, shared by every mechanical reader: a missing codex is NOT an empty
+    codex, and a codex from another schema is NOT silently half-read. Both used to
     surface as an empty result set with exit code 0, which reads as "nothing matches"
     when the truth is "nothing was even looked at".
     """
     if not path.exists():
-        emit.fail(command, f"Atlas not found: {path} — run `fauna-codex scan` first, "
-                           f"or pass --atlas <path>.", as_json)
+        emit.fail(command, f"Codex not found: {path} — run `code-fauna-codex scan` first, "
+                           f"or pass --codex <path>.", as_json)
         return None
-    atlas = load_json(path, {})
-    schema_error = atlas_schema_error(atlas, path)
+    codex = load_json(path, {})
+    schema_error = codex_schema_error(codex, path)
     if schema_error:
         emit.fail(command, schema_error, as_json)
         return None
-    return atlas
+    return codex
 
 
 def cmd_scan(args: argparse.Namespace) -> int:
@@ -81,34 +81,34 @@ def cmd_scan(args: argparse.Namespace) -> int:
     out_path = Path(args.out)
     previous = load_json(out_path, {})
     try:
-        atlas = build_atlas(root, ignore_globs=args.ignore or [], previous=previous,
+        codex = build_codex(root, ignore_globs=args.ignore or [], previous=previous,
                             parser_mode=args.parser)
     except RuntimeError as exc:
         emit.fail("scan", str(exc), args.json)
         return EXIT_ERROR
-    save_json(out_path, atlas)
+    save_json(out_path, codex)
 
-    total = sum(len(rows) for rows in atlas["symbols"].values())
-    edges = atlas.get("edges") or {}
+    total = sum(len(rows) for rows in codex["symbols"].values())
+    edges = codex.get("edges") or {}
     if args.json:
         emit.json_ok("scan", root=str(root), out=str(out_path),
-                     atlas_schema_version=atlas.get("schema_version"),
-                     files=len(atlas["files"]), symbols=total,
+                     codex_schema_version=codex.get("schema_version"),
+                     files=len(codex["files"]), symbols=total,
                      edges={"files_with_imports": len(edges.get("imports") or {}),
                             "calls": len(edges.get("calls") or [])})
     else:
-        print(f"Indexed {len(atlas['files'])} file(s), {total} symbol(s) -> {out_path}")
+        print(f"Indexed {len(codex['files'])} file(s), {total} symbol(s) -> {out_path}")
     return EXIT_OK
 
 
 def cmd_find(args: argparse.Namespace) -> int:
-    atlas = _load_atlas(Path(args.atlas), "find", args.json)
-    if atlas is None:
+    codex = _load_codex(Path(args.codex), "find", args.json)
+    if codex is None:
         return EXIT_NEEDS_USER
 
     pattern = args.pattern.lower()
     hits = []
-    for section, rows in atlas.get("symbols", {}).items():
+    for section, rows in codex.get("symbols", {}).items():
         for row in rows:
             haystack = " ".join([row.get("name", ""), row.get("signature", ""),
                                  row.get("docstring", ""), row.get("file", "")]).lower()
@@ -139,11 +139,11 @@ def cmd_find(args: argparse.Namespace) -> int:
 
 
 def cmd_section(args: argparse.Namespace) -> int:
-    atlas = _load_atlas(Path(args.atlas), "section", args.json)
-    if atlas is None:
+    codex = _load_codex(Path(args.codex), "section", args.json)
+    if codex is None:
         return EXIT_NEEDS_USER
 
-    rows = atlas.get("symbols", {}).get(args.name, [])
+    rows = codex.get("symbols", {}).get(args.name, [])
     if args.json:
         emit.json_ok("section", name=args.name, count=len(rows), rows=rows)
     else:
@@ -155,12 +155,12 @@ def cmd_deps(args: argparse.Namespace) -> int:
     """Both directions of the call graph for one symbol. Python only — the edge data
     itself is Python-only, and saying so beats returning a confident empty list for a
     Go or TypeScript symbol."""
-    atlas = _load_atlas(Path(args.atlas), "deps", args.json)
-    if atlas is None:
+    codex = _load_codex(Path(args.codex), "deps", args.json)
+    if codex is None:
         return EXIT_NEEDS_USER
 
-    callers = callers_of(atlas, args.symbol)
-    callees = callees_of(atlas, args.symbol)
+    callers = callers_of(codex, args.symbol)
+    callees = callees_of(codex, args.symbol)
 
     if args.json:
         emit.json_ok("deps", symbol=args.symbol, callers=callers, callees=callees,
@@ -181,11 +181,11 @@ def cmd_deps(args: argparse.Namespace) -> int:
 def cmd_unused(args: argparse.Namespace) -> int:
     """Symbols never named at a call site. A HINT, not a verdict — see the warning
     printed with the report, and `unreferenced_symbols`' docstring."""
-    atlas = _load_atlas(Path(args.atlas), "unused", args.json)
-    if atlas is None:
+    codex = _load_codex(Path(args.codex), "unused", args.json)
+    if codex is None:
         return EXIT_NEEDS_USER
 
-    rows = unreferenced_symbols(atlas)
+    rows = unreferenced_symbols(codex)
     if args.json:
         emit.json_ok("unused", count=len(rows), symbols=rows,
                      caveat="Heuristic: a symbol reached only through dynamic dispatch, a "
@@ -207,11 +207,11 @@ def cmd_diff(args: argparse.Namespace) -> int:
 
 
 def cmd_doctor(args: argparse.Namespace) -> int:
-    return _cmd_doctor(Path(args.atlas), Path(args.index), args.json)
+    return _cmd_doctor(Path(args.codex), Path(args.index), args.json)
 
 
 def cmd_embed(args: argparse.Namespace) -> int:
-    return _cmd_embed(Path(args.atlas), Path(args.index), args.provider, args.model,
+    return _cmd_embed(Path(args.codex), Path(args.index), args.provider, args.model,
                       args.dimensions, args.batch_size, args.timeout, args.json)
 
 
@@ -227,18 +227,18 @@ def cmd_similar(args: argparse.Namespace) -> int:
 
 
 def cmd_status(args: argparse.Namespace) -> int:
-    return _cmd_status(Path(args.atlas), Path(args.index), args.json)
+    return _cmd_status(Path(args.codex), Path(args.index), args.json)
 
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        prog="fauna-codex", epilog=EPILOG,
+        prog="code-fauna-codex", epilog=EPILOG,
         formatter_class=argparse.RawDescriptionHelpFormatter,
-        description="Mechanical + optional semantic code-symbol atlas for any repository.",
+        description="Mechanical + optional semantic code-symbol codex for any repository.",
     )
     parser.add_argument("--version", action="version",
-                        version=f"fauna-codex {_package_version()}")
-    # Carried by every subparser rather than the top-level parser, so `fauna-codex find x
+                        version=f"code-fauna-codex {_package_version()}")
+    # Carried by every subparser rather than the top-level parser, so `code-fauna-codex find x
     # --json` works — which is where a user (and an agent) naturally puts it.
     common = argparse.ArgumentParser(add_help=False)
     common.add_argument("--json", action="store_true", help=(
@@ -249,12 +249,12 @@ def build_parser() -> argparse.ArgumentParser:
     sub = parser.add_subparsers(dest="command", required=True)
 
     p_scan = sub.add_parser("scan", parents=[common],
-                            help="Build the mechanical atlas (no API key needed).")
+                            help="Build the mechanical codex (no API key needed).")
     p_scan.add_argument("root", help="Repository root to scan.")
-    p_scan.add_argument("--out", default="atlas.json", help="Output JSON path.")
+    p_scan.add_argument("--out", default="codex.json", help="Output JSON path.")
     p_scan.add_argument("--ignore", action="append", default=[], help=(
         "Glob to exclude (repeatable), matched against the POSIX-relative path. "
-        "Unioned with the globs in a .faunacodexignore file at the scan root, if present."
+        "Unioned with the globs in a .codefaunacodexignore file at the scan root, if present."
     ))
     p_scan.add_argument("--parser", default="auto", choices=["auto", "regex", "treesitter"], help=(
         "Backend for .js/.jsx/.ts/.tsx, .go and .rs (Python is always ast). 'auto' "
@@ -265,49 +265,49 @@ def build_parser() -> argparse.ArgumentParser:
     ))
     p_scan.set_defaults(func=cmd_scan)
 
-    p_find = sub.add_parser("find", parents=[common], help="Search the atlas by pattern.")
+    p_find = sub.add_parser("find", parents=[common], help="Search the codex by pattern.")
     p_find.add_argument("pattern")
-    p_find.add_argument("--atlas", default="atlas.json")
+    p_find.add_argument("--codex", default="codex.json")
     p_find.set_defaults(func=cmd_find)
 
     p_section = sub.add_parser("section", parents=[common],
-                               help="Dump one atlas section as JSON.")
+                               help="Dump one codex section as JSON.")
     p_section.add_argument("name")
-    p_section.add_argument("--atlas", default="atlas.json")
+    p_section.add_argument("--codex", default="codex.json")
     p_section.set_defaults(func=cmd_section)
 
     p_deps = sub.add_parser("deps", parents=[common], help=(
-        "Callers and callees of a symbol — offline, from the atlas's call edges "
+        "Callers and callees of a symbol — offline, from the codex's call edges "
         "(Python files only)."
     ))
     p_deps.add_argument("symbol")
-    p_deps.add_argument("--atlas", default="atlas.json")
+    p_deps.add_argument("--codex", default="codex.json")
     p_deps.set_defaults(func=cmd_deps)
 
     p_unused = sub.add_parser("unused", parents=[common], help=(
         "Python symbols never named at any call site — a HINT, not a verdict. Offline."
     ))
-    p_unused.add_argument("--atlas", default="atlas.json")
+    p_unused.add_argument("--codex", default="codex.json")
     p_unused.set_defaults(func=cmd_unused)
 
     p_diff = sub.add_parser("diff", parents=[common], help=(
-        "Compare two atlas snapshots: added/removed/moved/re-signatured symbols. Offline."
+        "Compare two codex snapshots: added/removed/moved/re-signatured symbols. Offline."
     ))
-    p_diff.add_argument("old", help="Path to the older atlas.json.")
-    p_diff.add_argument("new", help="Path to the newer atlas.json.")
+    p_diff.add_argument("old", help="Path to the older codex.json.")
+    p_diff.add_argument("new", help="Path to the newer codex.json.")
     p_diff.set_defaults(func=cmd_diff)
 
     p_doctor = sub.add_parser("doctor", parents=[common], help=(
         "Environment diagnostic: versions, parser backends, providers, keys configured "
-        "(count only), atlas/index state. Offline."
+        "(count only), codex/index state. Offline."
     ))
-    p_doctor.add_argument("--atlas", default="atlas.json")
+    p_doctor.add_argument("--codex", default="codex.json")
     p_doctor.add_argument("--index", default="semantic_index.json")
     p_doctor.set_defaults(func=cmd_doctor)
 
     p_embed = sub.add_parser("embed", parents=[common],
-                             help="(Re)index the atlas — needs an API key.")
-    p_embed.add_argument("--atlas", default="atlas.json")
+                             help="(Re)index the codex — needs an API key.")
+    p_embed.add_argument("--codex", default="codex.json")
     p_embed.add_argument("--index", default="semantic_index.json")
     p_embed.add_argument("--provider", default="gemini", choices=["gemini", "openai", "local"])
     p_embed.add_argument("--model", default=None)
@@ -317,7 +317,7 @@ def build_parser() -> argparse.ArgumentParser:
     p_embed.set_defaults(func=cmd_embed)
 
     p_search = sub.add_parser("search", parents=[common],
-                              help="Search the atlas by meaning — needs an API key.")
+                              help="Search the codex by meaning — needs an API key.")
     p_search.add_argument("question")
     p_search.add_argument("--index", default="semantic_index.json")
     p_search.add_argument("--provider", default="gemini", choices=["gemini", "openai", "local"])
@@ -354,7 +354,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     p_status = sub.add_parser("status", parents=[common],
                               help="Index state — offline, no network call.")
-    p_status.add_argument("--atlas", default="atlas.json")
+    p_status.add_argument("--codex", default="codex.json")
     p_status.add_argument("--index", default="semantic_index.json")
     p_status.set_defaults(func=cmd_status)
 

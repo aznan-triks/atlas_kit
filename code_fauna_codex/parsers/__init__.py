@@ -1,4 +1,4 @@
-"""Parser registry — extension -> backend, mirrors fauna_codex.providers.PROVIDERS.
+"""Parser registry — extension -> backend, mirrors code_fauna_codex.providers.PROVIDERS.
 
 'regex' is always available (every extension the old best-effort scanner covered).
 'treesitter' covers .js/.jsx/.ts/.tsx, .go and .rs, each behind its own optional grammar
@@ -8,9 +8,9 @@ than per backend. Python is not part of this registry — it has exactly one eng
 """
 from __future__ import annotations
 
-from fauna_codex.parsers.base import CodeParser, supports_extension
-from fauna_codex.parsers.regex_parser import RegexParser
-from fauna_codex.parsers.treesitter_parser import (
+from code_fauna_codex.parsers.base import CodeParser, supports_extension
+from code_fauna_codex.parsers.regex_parser import RegexParser
+from code_fauna_codex.parsers.treesitter_parser import (
     TREESITTER_AVAILABLE,
     TreeSitterParser,
     missing_grammar_message,

@@ -1,4 +1,4 @@
-"""Tests — fauna_codex.providers.local. No real fastembed call: _default_embed_fn is faked."""
+"""Tests — code_fauna_codex.providers.local. No real fastembed call: _default_embed_fn is faked."""
 from __future__ import annotations
 
 import math
@@ -6,8 +6,8 @@ import sys
 
 import pytest
 
-from fauna_codex.providers.base import EmbeddingError, EmbedRequest
-from fauna_codex.providers.local import LocalProvider
+from code_fauna_codex.providers.base import EmbeddingError, EmbedRequest
+from code_fauna_codex.providers.local import LocalProvider
 
 
 def _request(**overrides):
@@ -23,13 +23,13 @@ def test_local_provider_requires_no_api_key():
 
 
 def test_registry_includes_local_provider():
-    from fauna_codex.providers import PROVIDERS, get_provider
+    from code_fauna_codex.providers import PROVIDERS, get_provider
     assert "local" in PROVIDERS
     assert isinstance(get_provider("local"), LocalProvider)
 
 
 def test_local_provider_embed_l2_normalizes(monkeypatch):
-    import fauna_codex.providers.local as local_mod
+    import code_fauna_codex.providers.local as local_mod
 
     def fake_embed_fn(model_name, texts):
         assert model_name == "m"

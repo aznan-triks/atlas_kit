@@ -1,4 +1,4 @@
-"""Semantic mode: build a vector index over the mechanical atlas, search it by meaning.
+"""Semantic mode: build a vector index over the mechanical codex, search it by meaning.
 
 Provider-agnostic — this module never talks HTTP directly, it goes through
 `providers.EmbeddingProvider`. Same incremental-hash doctrine as `scan.py`.
@@ -11,10 +11,10 @@ import statistics
 import sys
 from pathlib import Path
 
-from fauna_codex import emit
-from fauna_codex.index_store import atlas_schema_error, load_json, save_json
-from fauna_codex.providers import get_provider
-from fauna_codex.providers.base import EmbedRequest, EmbeddingError, InvalidApiKey, QuotaExhausted, l2_normalize
+from code_fauna_codex import emit
+from code_fauna_codex.index_store import codex_schema_error, load_json, save_json
+from code_fauna_codex.providers import get_provider
+from code_fauna_codex.providers.base import EmbedRequest, EmbeddingError, InvalidApiKey, QuotaExhausted, l2_normalize
 
 DEFAULT_BATCH_SIZE = 50
 DEFAULT_TOP_K = 8
@@ -52,9 +52,9 @@ def entry_hash(text: str, model: str, dim: int) -> str:
     return hashlib.sha256(f"{model}|{dim}|{text}".encode("utf-8")).hexdigest()
 
 
-def iter_atlas_entries(atlas: dict, model: str = "", dim: int = 0) -> list[dict]:
+def iter_codex_entries(codex: dict, model: str = "", dim: int = 0) -> list[dict]:
     out = []
-    for section, rows in (atlas.get("symbols") or {}).items():
+    for section, rows in (codex.get("symbols") or {}).items():
         for row in rows:
             text = entry_text(section, row)
             out.append({
@@ -111,7 +111,7 @@ def recentred_entries(index: dict) -> list[dict]:
     """
     idx_centroid = index.get("centroid")
     if not idx_centroid:
-        raise ValueError("Index predates centroid-based search — run `fauna-codex embed` to rebuild.")
+        raise ValueError("Index predates centroid-based search — run `code-fauna-codex embed` to rebuild.")
     out = []
     for key, row in (index.get("entries") or {}).items():
         out.append({**row, "key": key, "vector_r": recentre(row.get("vector") or [], idx_centroid)})
@@ -198,15 +198,15 @@ def search(index: dict, query_vector: list[float], top_k: int, min_score: float,
 
 def index_schema_error(index: dict, path: Path) -> str | None:
     """Return an actionable message if `index` was written under a key schema this
-    code cannot read correctly, else None. Mirrors `index_store.atlas_schema_error`,
-    for the semantic index instead of the atlas.
+    code cannot read correctly, else None. Mirrors `index_store.codex_schema_error`,
+    for the semantic index instead of the codex.
 
     Written ONCE and called by every index READER (`search`, `similar`, `status`) —
     they used to trust `index['entries']` blindly, so an index written under the old
     key schema was read as if it were current and every key silently mismatched.
     `cmd_embed` deliberately does NOT call this: it is the one command that can fix
     the file (it migrates the keys in place, see cmd_embed step 1), which is exactly
-    why every message here says "run `fauna-codex embed`".
+    why every message here says "run `code-fauna-codex embed`".
 
     An index with no entries carries no keys to misread, so it gets no verdict — a
     missing/empty index must stay reportable by `status` and must keep producing
@@ -222,10 +222,10 @@ def index_schema_error(index: dict, path: Path) -> str | None:
     if found == CURRENT_KEY_SCHEMA:
         return None
     if found > CURRENT_KEY_SCHEMA:
-        return (f"Index {path} was written by a newer fauna-codex (key schema {found} > "
-                f"{CURRENT_KEY_SCHEMA}) — upgrade fauna-codex, or re-run `fauna-codex embed`.")
-    return (f"Index {path} uses key schema {found}, this fauna-codex expects "
-            f"{CURRENT_KEY_SCHEMA} — re-run `fauna-codex embed` to rebuild it.")
+        return (f"Index {path} was written by a newer code-fauna-codex (key schema {found} > "
+                f"{CURRENT_KEY_SCHEMA}) — upgrade code-fauna-codex, or re-run `code-fauna-codex embed`.")
+    return (f"Index {path} uses key schema {found}, this code-fauna-codex expects "
+            f"{CURRENT_KEY_SCHEMA} — re-run `code-fauna-codex embed` to rebuild it.")
 
 
 def _resolve_api_keys(provider) -> list[str]:
@@ -265,12 +265,12 @@ def _embed_with_rotation(provider, keys: list[str],
     raise last_exc
 
 
-def cmd_embed(atlas_path: Path, index_path: Path, provider_name: str, model: str | None,
+def cmd_embed(codex_path: Path, index_path: Path, provider_name: str, model: str | None,
              dimensions: int | None, batch_size: int, timeout_s: float,
              as_json: bool = False) -> int:
-    if not atlas_path.exists():
-        emit.fail("embed", f"Atlas not found: {atlas_path} — run `fauna-codex scan` first, or pass "
-                  f"--atlas <path>. Refusing to treat a missing atlas as empty (that would "
+    if not codex_path.exists():
+        emit.fail("embed", f"Codex not found: {codex_path} — run `code-fauna-codex scan` first, or pass "
+                  f"--codex <path>. Refusing to treat a missing codex as empty (that would "
                   f"prune the entire index as stale).", as_json)
         return 2
 
@@ -288,16 +288,16 @@ def cmd_embed(atlas_path: Path, index_path: Path, provider_name: str, model: str
     else:
         api_keys = [""]
 
-    atlas = load_json(atlas_path, {"symbols": {}})
-    # Same reasoning as the missing-atlas guard above, one step further: an atlas this
+    codex = load_json(codex_path, {"symbols": {}})
+    # Same reasoning as the missing-codex guard above, one step further: a codex this
     # code cannot read correctly must never be treated as authoritative, because the
     # prune step below deletes every index entry it cannot find in it.
-    schema_error = atlas_schema_error(atlas, atlas_path)
+    schema_error = codex_schema_error(codex, codex_path)
     if schema_error:
         emit.fail("embed", schema_error, as_json)
         return 2
 
-    entries = iter_atlas_entries(atlas, model=model, dim=dim)
+    entries = iter_codex_entries(codex, model=model, dim=dim)
     index = load_json(index_path, {"model": "", "dim": 0, "entries": {}})
 
     if index.get("model") != model or int(index.get("dim") or 0) != dim:
@@ -320,7 +320,7 @@ def cmd_embed(atlas_path: Path, index_path: Path, provider_name: str, model: str
         index["entries"] = migrated
     index["key_schema"] = CURRENT_KEY_SCHEMA
 
-    # 2. Prune index entries with no matching atlas entry anymore (renamed/removed
+    # 2. Prune index entries with no matching codex entry anymore (renamed/removed
     # symbols, or the pre-fix collision bug's already-lost victims).
     current_keys = {e["key"] for e in entries}
     stale_keys = [k for k in index["entries"] if k not in current_keys]
@@ -338,7 +338,7 @@ def cmd_embed(atlas_path: Path, index_path: Path, provider_name: str, model: str
         Both `embed` success paths (nothing to do / index written) go through here so
         the two modes can never drift apart."""
         if as_json:
-            emit.json_ok("embed", atlas=str(atlas_path), index=str(index_path),
+            emit.json_ok("embed", codex=str(codex_path), index=str(index_path),
                          provider=provider.name, model=model, dim=dim,
                          entries_total=len(entries), entries_indexed=len(index["entries"]),
                          pruned=len(stale_keys), migrated=migrated_count)
@@ -396,14 +396,14 @@ def cmd_search(question: str, index_path: Path, provider_name: str,
                section: str | None, timeout_s: float, as_json: bool = False) -> int:
     index = load_json(index_path, {"model": "", "dim": 0, "entries": {}})
     if not index.get("entries"):
-        emit.fail("search", "Index is empty — run `fauna-codex embed` first.", as_json)
+        emit.fail("search", "Index is empty — run `code-fauna-codex embed` first.", as_json)
         return 1
     schema_error = index_schema_error(index, index_path)
     if schema_error:
         emit.fail("search", schema_error, as_json)
         return 2
     if not index.get("centroid"):
-        emit.fail("search", "Index predates centroid-based search — run `fauna-codex embed` "
+        emit.fail("search", "Index predates centroid-based search — run `code-fauna-codex embed` "
                   "to rebuild.", as_json)
         return 2
 
@@ -493,14 +493,14 @@ def cmd_similar(index_path: Path, min_score: float, section: str | None,
     """
     index = load_json(index_path, {"model": "", "dim": 0, "entries": {}})
     if not index.get("entries"):
-        emit.fail("similar", "Index is empty — run `fauna-codex embed` first.", as_json)
+        emit.fail("similar", "Index is empty — run `code-fauna-codex embed` first.", as_json)
         return 1
     schema_error = index_schema_error(index, index_path)
     if schema_error:
         emit.fail("similar", schema_error, as_json)
         return 2
     if not index.get("centroid"):
-        emit.fail("similar", "Index predates centroid-based search — run `fauna-codex embed` "
+        emit.fail("similar", "Index predates centroid-based search — run `code-fauna-codex embed` "
                   "to rebuild.", as_json)
         return 2
 
@@ -548,10 +548,10 @@ def cmd_similar(index_path: Path, min_score: float, section: str | None,
     return 0
 
 
-def cmd_status(atlas_path: Path, index_path: Path, as_json: bool = False) -> int:
-    if not atlas_path.exists():
-        emit.fail("status", f"Atlas not found: {atlas_path} — run `fauna-codex scan` first, or "
-                  f"pass --atlas <path>.", as_json)
+def cmd_status(codex_path: Path, index_path: Path, as_json: bool = False) -> int:
+    if not codex_path.exists():
+        emit.fail("status", f"Codex not found: {codex_path} — run `code-fauna-codex scan` first, or "
+                  f"pass --codex <path>.", as_json)
         return 2
 
     index = load_json(index_path, {"model": "", "dim": 0, "entries": {}})
@@ -560,15 +560,15 @@ def cmd_status(atlas_path: Path, index_path: Path, as_json: bool = False) -> int
         emit.fail("status", schema_error, as_json)
         return 2
 
-    atlas = load_json(atlas_path, {"symbols": {}})
-    # An atlas this code cannot read correctly cannot be compared against the index
+    codex = load_json(codex_path, {"symbols": {}})
+    # An codex this code cannot read correctly cannot be compared against the index
     # either — the "not indexed" count below would be fiction. Refuse before comparing.
-    atlas_error = atlas_schema_error(atlas, atlas_path)
-    if atlas_error:
-        emit.fail("status", atlas_error, as_json)
+    codex_error = codex_schema_error(codex, codex_path)
+    if codex_error:
+        emit.fail("status", codex_error, as_json)
         return 2
 
-    entries = iter_atlas_entries(atlas, model=index.get("model", ""), dim=int(index.get("dim") or 0))
+    entries = iter_codex_entries(codex, model=index.get("model", ""), dim=int(index.get("dim") or 0))
     indexed = index.get("entries") or {}
     stale = [e["key"] for e in entries if (indexed.get(e["key"]) or {}).get("hash") != e["hash"]]
 
@@ -576,8 +576,8 @@ def cmd_status(atlas_path: Path, index_path: Path, as_json: bool = False) -> int
         # key_schema 0 means "field absent", which only reaches here on an empty index —
         # a non-empty one without the field is schema 1 and was refused above.
         emit.json_ok("status",
-                     atlas={"path": str(atlas_path), "resources": len(entries),
-                            "schema_version": int(atlas.get("schema_version") or 0)},
+                     codex={"path": str(codex_path), "resources": len(entries),
+                            "schema_version": int(codex.get("schema_version") or 0)},
                      index={"path": str(index_path), "resources": len(indexed),
                             "model": index.get("model") or "", "dim": int(index.get("dim") or 0),
                             "key_schema": int(index.get("key_schema") or 0),
@@ -586,5 +586,5 @@ def cmd_status(atlas_path: Path, index_path: Path, as_json: bool = False) -> int
 
     print(f"Index : {len(indexed)} resource(s) — model {index.get('model') or '(none)'} / "
           f"{index.get('dim') or 0} dimensions")
-    print(f"Atlas : {len(entries)} resource(s) — {len(stale)} not indexed")
+    print(f"Codex : {len(entries)} resource(s) — {len(stale)} not indexed")
     return 0

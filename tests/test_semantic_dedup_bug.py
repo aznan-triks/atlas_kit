@@ -1,4 +1,4 @@
-"""Regression test — fauna_codex.semantic key collision on duplicate names, fixed.
+"""Regression test — code_fauna_codex.semantic key collision on duplicate names, fixed.
 
 `entry_key(section, row)` used to omit the line number, so two distinct
 Symbol entries that share (section, name, file) but differ only by line —
@@ -15,8 +15,8 @@ from __future__ import annotations
 
 from conftest import write
 
-from fauna_codex.scan import build_atlas
-from fauna_codex.semantic import entry_key, iter_atlas_entries
+from code_fauna_codex.scan import build_codex
+from code_fauna_codex.semantic import entry_key, iter_codex_entries
 
 
 def test_duplicate_function_name_collides_on_entry_key(tmp_path):
@@ -34,8 +34,8 @@ def process(b):
     return b * 2
 ''')
 
-    atlas = build_atlas(tmp_path)
-    entries = iter_atlas_entries(atlas)
+    codex = build_codex(tmp_path)
+    entries = iter_codex_entries(codex)
 
     process_entries = [e for e in entries if e["name"] == "process" and e["file"] == "mod.py"]
 

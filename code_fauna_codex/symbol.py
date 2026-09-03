@@ -1,4 +1,4 @@
-"""Shared symbol record — used by scan.py's ast parser and every fauna_codex.parsers backend.
+"""Shared symbol record — used by scan.py's ast parser and every code_fauna_codex.parsers backend.
 Its own module so parsers/ and scan.py can both depend on it without a circular import."""
 from __future__ import annotations
 

@@ -1,11 +1,11 @@
-"""Regression test — fauna_codex.scan.parse_generic_file + fauna_codex.semantic.entry_text
+"""Regression test — code_fauna_codex.scan.parse_generic_file + code_fauna_codex.semantic.entry_text
 on a real-shaped, mixed-language repo.
 
-Audit finding: fauna_codex's own repo has zero .js/.ts/.go/.rs files, so the
+Audit finding: code_fauna_codex's own repo has zero .js/.ts/.go/.rs files, so the
 generic-language parser (parse_generic_file, used for .js/.jsx/.ts/.tsx/.go/.rs)
 and semantic.entry_text() are only ever exercised by tests/test_scan.py's minimal
-synthetic single-symbol checks — never end-to-end, through build_atlas +
-iter_atlas_entries, against a repo with several different generic-language
+synthetic single-symbol checks — never end-to-end, through build_codex +
+iter_codex_entries, against a repo with several different generic-language
 symbols side by side (the way a real JS/Go/Rust codebase would be scanned).
 
 This closes that gap: it proves generic-language entries always carry a real,
@@ -19,8 +19,8 @@ from __future__ import annotations
 
 from conftest import write
 
-from fauna_codex.scan import build_atlas
-from fauna_codex.semantic import iter_atlas_entries
+from code_fauna_codex.scan import build_codex
+from code_fauna_codex.semantic import iter_codex_entries
 
 
 def test_generic_language_entries_have_distinct_nonempty_signatures(tmp_path):
@@ -28,8 +28,8 @@ def test_generic_language_entries_have_distinct_nonempty_signatures(tmp_path):
     write(tmp_path, "math.rs", "pub fn subtract_numbers(a: i32, b: i32) -> i32 {\n    a - b\n}\n")
     write(tmp_path, "math.js", "export function multiplyNumbers(a, b) {\n  return a * b;\n}\n")
 
-    atlas = build_atlas(tmp_path)
-    entries = iter_atlas_entries(atlas)
+    codex = build_codex(tmp_path)
+    entries = iter_codex_entries(codex)
 
     generic = [e for e in entries if e["section"] == "generic_functions"]
     names = {e["name"] for e in generic}

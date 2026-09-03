@@ -3,11 +3,11 @@ regex_parser's best-effort line matching: catches multi-line signatures, arrow f
 assigned to a const, class methods, Go receiver methods and Rust impl methods (none of
 which regex_parser ever extracted).
 
-Optional dependency: pip install 'fauna-codex[treesitter]'. Each language grammar is its
+Optional dependency: pip install 'code-fauna-codex[treesitter]'. Each language grammar is its
 own pip package, so availability is PER EXTENSION, not per backend: a machine can have
 tree-sitter-javascript and not tree-sitter-go. `available` therefore only means "at least
 one grammar imported"; `supports(extension)` is the real check. Import failure is recorded,
-never acted on — the registry (fauna_codex.parsers) decides what a missing grammar means for
+never acted on — the registry (code_fauna_codex.parsers) decides what a missing grammar means for
 a given --parser mode, this module never falls back on its own.
 """
 from __future__ import annotations
@@ -15,7 +15,7 @@ from __future__ import annotations
 import importlib
 from pathlib import Path
 
-from fauna_codex.symbol import Symbol
+from code_fauna_codex.symbol import Symbol
 
 try:
     from tree_sitter import Language, Parser as _TSParser
@@ -68,7 +68,7 @@ def missing_grammar_message(extension: str) -> str:
     return (
         f"--parser treesitter requested for '{extension}' but its tree-sitter grammar "
         f"isn't installed — pip install {package} "
-        f"(or pip install 'fauna-codex[treesitter]' for every grammar)."
+        f"(or pip install 'code-fauna-codex[treesitter]' for every grammar)."
     )
 
 
@@ -169,7 +169,7 @@ def _walk_go(node, rel: str, language: str, out: list[Symbol]) -> None:
                 kind = spec.child_by_field_name("type")
                 name = _field_name(spec)
                 # Only structs: interfaces and type aliases aren't "classes" in any
-                # sense the atlas uses.
+                # sense the codex uses.
                 if not name or kind is None or kind.type != "struct_type":
                     continue
                 # `type Widget struct {` reads better than the bare spec header

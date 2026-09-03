@@ -1,4 +1,4 @@
-"""Tests — fauna_codex.semantic.cmd_embed: key-schema migration and stale-entry pruning.
+"""Tests — code_fauna_codex.semantic.cmd_embed: key-schema migration and stale-entry pruning.
 
 Both scenarios are constructed so pending_entries() returns nothing to embed
 (the stored hash already matches), so cmd_embed never needs to make a real
@@ -10,26 +10,26 @@ import json
 
 from conftest import write
 
-from fauna_codex.index_store import load_json
-from fauna_codex.semantic import CURRENT_KEY_SCHEMA, cmd_embed, entry_key, iter_atlas_entries
-from fauna_codex.scan import build_atlas
+from code_fauna_codex.index_store import load_json
+from code_fauna_codex.semantic import CURRENT_KEY_SCHEMA, cmd_embed, entry_key, iter_codex_entries
+from code_fauna_codex.scan import build_codex
 
 MODEL = "test-model"
 DIM = 4
 
 
-def _atlas_with_one_entry(tmp_path):
+def _codex_with_one_entry(tmp_path):
     write(tmp_path, "mod.py", 'def foo(a):\n    """Do foo."""\n    return a\n')
-    atlas_path = tmp_path / "atlas.json"
-    atlas = build_atlas(tmp_path)
-    atlas_path.write_text(json.dumps(atlas), encoding="utf-8")
-    return atlas_path, atlas
+    codex_path = tmp_path / "codex.json"
+    codex = build_codex(tmp_path)
+    codex_path.write_text(json.dumps(codex), encoding="utf-8")
+    return codex_path, codex
 
 
 def test_embed_migrates_old_format_keys_and_preserves_vectors(tmp_path, monkeypatch, capsys):
     monkeypatch.setenv("GEMINI_API_KEY", "fake-key")
-    atlas_path, atlas = _atlas_with_one_entry(tmp_path)
-    entries = iter_atlas_entries(atlas, model=MODEL, dim=DIM)
+    codex_path, codex = _codex_with_one_entry(tmp_path)
+    entries = iter_codex_entries(codex, model=MODEL, dim=DIM)
     assert len(entries) == 1
     entry = entries[0]
 
@@ -46,7 +46,7 @@ def test_embed_migrates_old_format_keys_and_preserves_vectors(tmp_path, monkeypa
         # no key_schema field — simulates a pre-migration index.
     }), encoding="utf-8")
 
-    code = cmd_embed(atlas_path, index_path, "gemini", MODEL, DIM, 50, 5.0)
+    code = cmd_embed(codex_path, index_path, "gemini", MODEL, DIM, 50, 5.0)
     out = capsys.readouterr().out
     assert code == 0
     assert "Migrated 1 index key" in out
@@ -59,10 +59,10 @@ def test_embed_migrates_old_format_keys_and_preserves_vectors(tmp_path, monkeypa
     assert index["entries"][new_key]["vector"] == vector
 
 
-def test_embed_prunes_orphaned_entries_with_no_matching_atlas_entry(tmp_path, monkeypatch, capsys):
+def test_embed_prunes_orphaned_entries_with_no_matching_codex_entry(tmp_path, monkeypatch, capsys):
     monkeypatch.setenv("GEMINI_API_KEY", "fake-key")
-    atlas_path, atlas = _atlas_with_one_entry(tmp_path)
-    entries = iter_atlas_entries(atlas, model=MODEL, dim=DIM)
+    codex_path, codex = _codex_with_one_entry(tmp_path)
+    entries = iter_codex_entries(codex, model=MODEL, dim=DIM)
     entry = entries[0]
     current_key = entry_key(entry["section"], entry)
     current_vector = [1.0, 0.0, 0.0, 0.0]
@@ -86,7 +86,7 @@ def test_embed_prunes_orphaned_entries_with_no_matching_atlas_entry(tmp_path, mo
         },
     }), encoding="utf-8")
 
-    code = cmd_embed(atlas_path, index_path, "gemini", MODEL, DIM, 50, 5.0)
+    code = cmd_embed(codex_path, index_path, "gemini", MODEL, DIM, 50, 5.0)
     out = capsys.readouterr().out
     assert code == 0
     assert "Pruned 1 stale index entrie(s)" in out
@@ -102,13 +102,13 @@ def test_embed_warns_before_wiping_index_on_model_dim_mismatch(tmp_path, monkeyp
     """A stored index built with a different model/dim can never be migrated (different
     vector dimensions can't coexist) — but the reset must be announced, never silent."""
     monkeypatch.setenv("GEMINI_API_KEY", "fake-key")
-    atlas_path, atlas = _atlas_with_one_entry(tmp_path)
+    codex_path, codex = _codex_with_one_entry(tmp_path)
 
     def fake_post(url, headers, json_body, timeout):
         n = len(json_body["requests"])
         return _FakeResp(200, {"embeddings": [{"values": [1.0, 0.0, 0.0, 0.0]}] * n})
 
-    import fauna_codex.providers.gemini as gemini_mod
+    import code_fauna_codex.providers.gemini as gemini_mod
     monkeypatch.setattr(gemini_mod, "_default_http_post", fake_post)
 
     index_path = tmp_path / "semantic_index.json"
@@ -123,7 +123,7 @@ def test_embed_warns_before_wiping_index_on_model_dim_mismatch(tmp_path, monkeyp
         "entries": old_entries,
     }), encoding="utf-8")
 
-    code = cmd_embed(atlas_path, index_path, "gemini", MODEL, DIM, 50, 5.0)
+    code = cmd_embed(codex_path, index_path, "gemini", MODEL, DIM, 50, 5.0)
     err = capsys.readouterr().err
     assert code == 0
     assert "1 old vector(s) discarded" in err
@@ -131,7 +131,7 @@ def test_embed_warns_before_wiping_index_on_model_dim_mismatch(tmp_path, monkeyp
 
     index = load_json(index_path, {})
     assert "old_section::old_name::old_file.py::1" not in index["entries"]
-    entry = iter_atlas_entries(atlas, model=MODEL, dim=DIM)[0]
+    entry = iter_codex_entries(codex, model=MODEL, dim=DIM)[0]
     assert entry_key(entry["section"], entry) in index["entries"]
 
 

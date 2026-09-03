@@ -7,7 +7,7 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-from fauna_codex.symbol import Symbol
+from code_fauna_codex.symbol import Symbol
 
 # One (regex, section) pair per extension group. Best-effort: catches the common
 # declaration shapes, not every valid syntax variant of each language.

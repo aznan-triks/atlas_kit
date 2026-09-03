@@ -1,7 +1,7 @@
 [project]
-name = "fauna-codex"
+name = "code-fauna-codex"
 version = "0.3.0"
-description = "Mechanical + optional semantic code-symbol atlas for any repository."
+description = "Mechanical + optional semantic code-symbol codex for any repository."
 readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "MIT" }
@@ -13,7 +13,7 @@ local = ["fastembed>=0.5"]
 treesitter = ["tree-sitter>=0.22", "tree-sitter-javascript>=0.21", "tree-sitter-typescript>=0.21", "tree-sitter-go>=0.25", "tree-sitter-rust>=0.24"]
 
 [project.scripts]
-fauna-codex = "fauna_codex.cli:main"
+code-fauna-codex = "code_fauna_codex.cli:main"
 
 [build-system]
 requires = ["setuptools>=68"]
@@ -21,4 +21,4 @@ build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["fauna_codex*"]
+include = ["code_fauna_codex*"]

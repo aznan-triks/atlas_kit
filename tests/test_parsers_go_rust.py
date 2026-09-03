@@ -10,8 +10,8 @@ pytest.importorskip("tree_sitter", reason="tree-sitter extras not installed")
 pytest.importorskip("tree_sitter_go", reason="tree-sitter-go not installed")
 pytest.importorskip("tree_sitter_rust", reason="tree-sitter-rust not installed")
 
-from fauna_codex.parsers import resolve_parser  # noqa: E402
-from fauna_codex.parsers.treesitter_parser import TreeSitterParser  # noqa: E402
+from code_fauna_codex.parsers import resolve_parser  # noqa: E402
+from code_fauna_codex.parsers.treesitter_parser import TreeSitterParser  # noqa: E402
 
 GO_SOURCE = """package widget
 
@@ -88,7 +88,7 @@ def test_go_extracts_functions_methods_and_structs(tmp_path):
     assert ("generic_functions", "Widget.Render") in found
     assert ("generic_functions", "Widget.Area") in found
     assert ("generic_classes", "Widget") in found
-    # Interfaces are not classes in the atlas sense — deliberately not extracted.
+    # Interfaces are not classes in the codex sense — deliberately not extracted.
     assert ("generic_classes", "Shape") not in found
 
 

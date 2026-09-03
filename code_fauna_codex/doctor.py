@@ -1,8 +1,8 @@
-"""`doctor` — offline self-diagnostic: why might an fauna-codex command fail here?
+"""`doctor` — offline self-diagnostic: why might an code-fauna-codex command fail here?
 
-Answers, without a single network call or API request: which fauna-codex is running,
+Answers, without a single network call or API request: which code-fauna-codex is running,
 which parser backend each supported extension would really use in `auto` mode, which
-embedding providers have a key configured, and whether the atlas/index files on disk
+embedding providers have a key configured, and whether the codex/index files on disk
 are readable and current.
 
 SECURITY: an API key value is never read into the report, never formatted, never
@@ -20,19 +20,19 @@ from dataclasses import asdict, dataclass
 from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
 
-from fauna_codex import emit
-from fauna_codex.index_store import atlas_schema_error
-from fauna_codex.parsers import PARSERS, resolve_parser
-from fauna_codex.parsers.base import supports_extension
+from code_fauna_codex import emit
+from code_fauna_codex.index_store import codex_schema_error
+from code_fauna_codex.parsers import PARSERS, resolve_parser
+from code_fauna_codex.parsers.base import supports_extension
 # Private, and deliberately so: it is the single source of truth for "which pip package
 # ships which extension's grammar". Re-deriving that table here would be a second,
 # divergent copy — the exact failure mode this diagnostic exists to catch.
-from fauna_codex.parsers.treesitter_parser import _PIP_PACKAGE_BY_EXT
-from fauna_codex.providers import PROVIDERS
-from fauna_codex.scan import SUPPORTED_EXTENSIONS
+from code_fauna_codex.parsers.treesitter_parser import _PIP_PACKAGE_BY_EXT
+from code_fauna_codex.providers import PROVIDERS
+from code_fauna_codex.scan import SUPPORTED_EXTENSIONS
 # Imported, not reimplemented: the plural-then-singular env-var rule must stay ONE
 # rule, or doctor would cheerfully report a key that `embed` cannot find.
-from fauna_codex.semantic import _resolve_api_keys
+from code_fauna_codex.semantic import _resolve_api_keys
 
 COMMAND = "doctor"
 
@@ -41,12 +41,12 @@ COMMAND = "doctor"
 # reporting "none" for the language the scanner parses best.
 _PYTHON_BACKEND = "ast (built-in)"
 
-_TREESITTER_HINT = "pip install 'fauna-codex[treesitter]'"
+_TREESITTER_HINT = "pip install 'code-fauna-codex[treesitter]'"
 
 
 @dataclass
 class RuntimeInfo:
-    fauna_codex_version: str
+    code_fauna_codex_version: str
     python_version: str
     platform: str
 
@@ -78,7 +78,7 @@ class ProviderInfo:
 
 
 @dataclass
-class AtlasInfo:
+class CodexInfo:
     path: str
     exists: bool
     size_bytes: int
@@ -104,7 +104,7 @@ class IndexInfo:
 
 @dataclass
 class FilesInfo:
-    atlas: AtlasInfo
+    codex: CodexInfo
     index: IndexInfo
 
 
@@ -118,7 +118,7 @@ class DoctorReport:
 
 def _read_json(path: Path) -> tuple[dict | None, str | None]:
     """Return (data, error). Unlike `index_store.load_json`, a malformed or unreadable
-    file is REPORTED instead of silently replaced by a default — a broken atlas is
+    file is REPORTED instead of silently replaced by a default — a broken codex is
     exactly the kind of failure cause a user runs `doctor` to find.
     """
     try:
@@ -141,12 +141,12 @@ def _size_bytes(path: Path) -> int:
 
 def _collect_runtime() -> RuntimeInfo:
     try:
-        installed = version("fauna-codex")
+        installed = version("code-fauna-codex")
     except PackageNotFoundError:
         # Running from a source checkout without `pip install -e .` — a real and
         # common state, not an error.
         installed = "unknown (not installed)"
-    return RuntimeInfo(fauna_codex_version=installed,
+    return RuntimeInfo(code_fauna_codex_version=installed,
                        python_version=platform.python_version(),
                        platform=platform.platform())
 
@@ -198,21 +198,21 @@ def _collect_providers() -> list[ProviderInfo]:
     return out
 
 
-def _collect_atlas(path: Path) -> AtlasInfo:
-    info = AtlasInfo(path=str(path), exists=path.exists(), size_bytes=0, read_error=None,
+def _collect_codex(path: Path) -> CodexInfo:
+    info = CodexInfo(path=str(path), exists=path.exists(), size_bytes=0, read_error=None,
                      schema_version=None, schema_error=None, file_count=None,
                      symbol_count=None)
     if not info.exists:
         return info
     info.size_bytes = _size_bytes(path)
-    atlas, error = _read_json(path)
-    if atlas is None:
+    codex, error = _read_json(path)
+    if codex is None:
         info.read_error = error
         return info
-    info.schema_version = int(atlas.get("schema_version") or 0)
-    info.schema_error = atlas_schema_error(atlas, path)
-    info.file_count = len(atlas.get("files") or {})
-    info.symbol_count = sum(len(rows) for rows in (atlas.get("symbols") or {}).values())
+    info.schema_version = int(codex.get("schema_version") or 0)
+    info.schema_error = codex_schema_error(codex, path)
+    info.file_count = len(codex.get("files") or {})
+    info.symbol_count = sum(len(rows) for rows in (codex.get("symbols") or {}).values())
     return info
 
 
@@ -236,21 +236,21 @@ def _collect_index(path: Path) -> IndexInfo:
     return info
 
 
-def _collect(atlas_path: Path, index_path: Path) -> DoctorReport:
+def _collect(codex_path: Path, index_path: Path) -> DoctorReport:
     return DoctorReport(
         runtime=_collect_runtime(),
         parsers=_collect_parsers(),
         providers=_collect_providers(),
-        files=FilesInfo(atlas=_collect_atlas(atlas_path), index=_collect_index(index_path)),
+        files=FilesInfo(codex=_collect_codex(codex_path), index=_collect_index(index_path)),
     )
 
 
 def _print_human(report: DoctorReport) -> None:
-    print("fauna-codex doctor — offline diagnostic, no network call, no API call.")
+    print("code-fauna-codex doctor — offline diagnostic, no network call, no API call.")
 
     runtime = report.runtime
     print("\n-- runtime")
-    print(f"  fauna-codex : {runtime.fauna_codex_version}")
+    print(f"  code-fauna-codex : {runtime.code_fauna_codex_version}")
     print(f"  Python    : {runtime.python_version}")
     print(f"  platform  : {runtime.platform}")
 
@@ -279,44 +279,44 @@ def _print_human(report: DoctorReport) -> None:
     print("  (key values are never read or printed — count only; set the plural "
           "<VAR>S, comma-separated, for rotation)")
 
-    atlas = report.files.atlas
+    codex = report.files.codex
     print("\n-- files")
-    if not atlas.exists:
-        print(f"  atlas {atlas.path}: MISSING — run `fauna-codex scan`.")
-    elif atlas.read_error:
-        print(f"  atlas {atlas.path}: {atlas.read_error} — re-run `fauna-codex scan`.")
+    if not codex.exists:
+        print(f"  codex {codex.path}: MISSING — run `code-fauna-codex scan`.")
+    elif codex.read_error:
+        print(f"  codex {codex.path}: {codex.read_error} — re-run `code-fauna-codex scan`.")
     else:
-        print(f"  atlas {atlas.path}: {atlas.size_bytes} bytes, schema "
-              f"{atlas.schema_version}, {atlas.file_count} file(s), "
-              f"{atlas.symbol_count} symbol(s)")
-        if atlas.schema_error:
-            print(f"    schema: {atlas.schema_error}")
+        print(f"  codex {codex.path}: {codex.size_bytes} bytes, schema "
+              f"{codex.schema_version}, {codex.file_count} file(s), "
+              f"{codex.symbol_count} symbol(s)")
+        if codex.schema_error:
+            print(f"    schema: {codex.schema_error}")
 
     index = report.files.index
     if not index.exists:
-        print(f"  index {index.path}: MISSING — run `fauna-codex embed` to create it.")
+        print(f"  index {index.path}: MISSING — run `code-fauna-codex embed` to create it.")
     elif index.read_error:
-        print(f"  index {index.path}: {index.read_error} — re-run `fauna-codex embed`.")
+        print(f"  index {index.path}: {index.read_error} — re-run `code-fauna-codex embed`.")
     else:
         print(f"  index {index.path}: {index.size_bytes} bytes, {index.entry_count} "
               f"entrie(s), model {index.model or '(none)'} / {index.dim or 0} dim, "
               f"key_schema {index.key_schema if index.key_schema is not None else '(none)'}")
         if not index.has_centroid:
-            print("    centroid: absent — `search`/`similar` need `fauna-codex embed` to rebuild.")
+            print("    centroid: absent — `search`/`similar` need `code-fauna-codex embed` to rebuild.")
         else:
             print("    centroid: present")
 
 
-def cmd_doctor(atlas_path: Path, index_path: Path, as_json: bool = False) -> int:
+def cmd_doctor(codex_path: Path, index_path: Path, as_json: bool = False) -> int:
     """Report, offline, everything needed to explain why a command might fail here.
 
-    Returns 0 whenever the diagnostic itself completed — even when the atlas is
+    Returns 0 whenever the diagnostic itself completed — even when the codex is
     missing, no API key is set, or tree-sitter is not installed. A diagnostic reports,
     it does not gate; the commands themselves still refuse what they cannot do.
     Returns 1 only if the diagnostic itself blew up.
     """
     try:
-        report = _collect(atlas_path, index_path)
+        report = _collect(codex_path, index_path)
     except Exception as exc:  # noqa: BLE001 — a diagnostic must never mask its own failure
         emit.fail(COMMAND, f"doctor failed to collect diagnostics: {exc}", as_json)
         return 1

@@ -1,16 +1,16 @@
-"""`diff` — offline comparison of two atlas snapshots. No network, no API key.
+"""`diff` — offline comparison of two codex snapshots. No network, no API key.
 
 Answers "what changed in this repo's symbols between two scans?" without re-reading
-the whole atlas: which files appeared, vanished or changed content, and which symbols
+the whole codex: which files appeared, vanished or changed content, and which symbols
 were added, removed, moved or re-signed.
 
 `diff` is a REPORT, not a gate: once the comparison actually ran it exits 0, whether
 or not it found differences. Only an unusable input (a missing file, an incompatible
-atlas schema) is a failure — never a silently empty comparison, which would report a
+codex schema) is a failure — never a silently empty comparison, which would report a
 whole repository as deleted. A caller that wants a gate reads the integer counts from
 the `--json` payload, e.g. `summary.symbols_removed > 0`.
 
-Unknown top-level atlas keys (`edges`, or anything added later) are ignored on
+Unknown top-level codex keys (`edges`, or anything added later) are ignored on
 purpose: this module only reads `files` and `symbols`.
 """
 from __future__ import annotations
@@ -20,8 +20,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Final
 
-from fauna_codex import emit
-from fauna_codex.index_store import atlas_schema_error, load_json
+from code_fauna_codex import emit
+from code_fauna_codex.index_store import codex_schema_error, load_json
 
 COMMAND: Final = "diff"
 
@@ -35,8 +35,8 @@ MAX_HUMAN_LINES_PER_GROUP: Final = 20
 
 
 @dataclass(frozen=True)
-class AtlasDiff:
-    """The complete result of comparing two atlases. Pure data — no I/O, no printing.
+class CodexDiff:
+    """The complete result of comparing two codexes. Pure data — no I/O, no printing.
 
     A symbol that both moved and changed signature appears in BOTH `symbols_moved` and
     `symbols_signature_changed`: they are independent facts about the same symbol, and
@@ -74,17 +74,17 @@ def symbol_identity(section: str, row: dict) -> str:
     return f"{section}::{row.get('name', '')}::{row.get('file', '')}"
 
 
-def _symbol_map(atlas: dict) -> dict[str, dict]:
-    """Flatten `atlas["symbols"]` into one {lookup key -> normalised row} map.
+def _symbol_map(codex: dict) -> dict[str, dict]:
+    """Flatten `codex["symbols"]` into one {lookup key -> normalised row} map.
 
     One file can legitimately hold two symbols sharing an identity (a name bound twice,
     an overload). They are kept apart by an occurrence suffix assigned in line order, so
     neither is silently dropped by the other — the reported `key` stays the plain
-    identity. Same input order in both atlases therefore pairs the same occurrences.
+    identity. Same input order in both codexes therefore pairs the same occurrences.
     """
     out: dict[str, dict] = {}
     occurrences: Counter[str] = Counter()
-    for section, rows in (atlas.get("symbols") or {}).items():
+    for section, rows in (codex.get("symbols") or {}).items():
         for row in sorted(rows, key=lambda r: int(r.get("line") or 0)):
             identity = symbol_identity(section, row)
             occurrences[identity] += 1
@@ -106,10 +106,10 @@ def _sorted_rows(rows: list[dict]) -> list[dict]:
     return sorted(rows, key=lambda r: (r["section"], r["file"], r["name"], r.get("line", 0)))
 
 
-def diff_atlases(old: dict, new: dict) -> AtlasDiff:
-    """Compare two loaded atlas dicts. Pure: no file access, no printing, no exit code.
+def diff_codexes(old: dict, new: dict) -> CodexDiff:
+    """Compare two loaded codex dicts. Pure: no file access, no printing, no exit code.
 
-    Callers pass already-validated atlases — schema validation belongs to `cmd_diff`,
+    Callers pass already-validated codexes — schema validation belongs to `cmd_diff`,
     so this function stays trivially testable without touching the filesystem.
     """
     old_files: dict[str, str] = old.get("files") or {}
@@ -141,7 +141,7 @@ def diff_atlases(old: dict, new: dict) -> AtlasDiff:
                                       "old_signature": before["signature"],
                                       "new_signature": after["signature"]})
 
-    return AtlasDiff(
+    return CodexDiff(
         files_added=files_added,
         files_removed=files_removed,
         files_changed=files_changed,
@@ -164,7 +164,7 @@ def _print_group(title: str, lines: list[str]) -> None:
               f"per group — use --json for the complete list)")
 
 
-def _print_human(result: AtlasDiff, old_path: Path, new_path: Path) -> None:
+def _print_human(result: CodexDiff, old_path: Path, new_path: Path) -> None:
     counts = result.summary()
     print(f"diff {old_path} -> {new_path}")
     print(f"files   : +{counts['files_added']} -{counts['files_removed']} "
@@ -192,31 +192,31 @@ def _print_human(result: AtlasDiff, old_path: Path, new_path: Path) -> None:
 
 
 def cmd_diff(old_path: Path, new_path: Path, as_json: bool = False) -> int:
-    """Compare two atlas files and report what changed. Returns the process exit code.
+    """Compare two codex files and report what changed. Returns the process exit code.
 
     Exits 0 as soon as the comparison ran — differences found or not. `diff` reports,
     it does not gate; gate on `summary` in the `--json` payload instead. Exits 2 when
     an input cannot be trusted (missing path, incompatible schema), because reporting
     an empty or wholesale-removed diff from a bad input is worse than failing loud.
     """
-    atlases: list[dict] = []
+    codexes: list[dict] = []
     for label, path in (("old", old_path), ("new", new_path)):
         if not path.exists():
-            emit.fail(COMMAND, f"Atlas not found ({label}): {path} — run `fauna-codex scan "
+            emit.fail(COMMAND, f"Codex not found ({label}): {path} — run `code-fauna-codex scan "
                                f"--out {path}` first, or pass an existing path. Refusing to "
-                               f"treat a missing atlas as empty (that would report the whole "
+                               f"treat a missing codex as empty (that would report the whole "
                                f"repository as added or removed).", as_json)
             return EXIT_NEEDS_USER
 
-        atlas = load_json(path, {})
+        codex = load_json(path, {})
         # Fail Fast: validate before reading anything out of it, never after.
-        error = atlas_schema_error(atlas, path)
+        error = codex_schema_error(codex, path)
         if error:
             emit.fail(COMMAND, error, as_json)
             return EXIT_NEEDS_USER
-        atlases.append(atlas)
+        codexes.append(codex)
 
-    result = diff_atlases(atlases[0], atlases[1])
+    result = diff_codexes(codexes[0], codexes[1])
 
     if as_json:
         emit.json_ok(

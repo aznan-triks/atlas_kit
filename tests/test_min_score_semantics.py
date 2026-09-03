@@ -12,8 +12,8 @@ from __future__ import annotations
 import math
 import statistics
 
-from fauna_codex.cli import build_parser
-from fauna_codex.semantic import (
+from code_fauna_codex.cli import build_parser
+from code_fauna_codex.semantic import (
     CURRENT_KEY_SCHEMA, DEFAULT_MIN_ZSCORE, DEFAULT_SIMILAR_MIN_ZSCORE,
     MIN_ENTRIES_FOR_ZSCORE, search, similar_pairs,
 )

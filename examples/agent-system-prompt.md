@@ -1,24 +1,24 @@
 # Drop-in system-prompt fragment
 
 Paste this into a coding agent's system prompt (Claude Code, Codex, Cursor, or your own
-harness) so it consults the atlas before writing code. It assumes `fauna-codex` is on the
-PATH and `atlas.json` is at the repository root.
+harness) so it consults the codex before writing code. It assumes `code-fauna-codex` is on the
+PATH and `codex.json` is at the repository root.
 
 ---
 
 ## Copy from here
 
 ```
-## Before writing code: check the atlas
+## Before writing code: check the codex
 
-This repository has an atlas of its symbols. Query it before implementing any new
+This repository has a codex of its symbols. Query it before implementing any new
 function, class or method — writing a second implementation of something that already
 exists is the failure this prevents.
 
-    fauna-codex scan .                     # refresh (incremental; only changed files are re-parsed)
-    fauna-codex find "<term>" --json       # keyword search over names, signatures, docstrings, paths
-    fauna-codex deps <symbol> --json       # callers and callees (Python only)
-    fauna-codex unused --json              # never-called symbols — a hint, not a verdict
+    code-fauna-codex scan .                     # refresh (incremental; only changed files are re-parsed)
+    code-fauna-codex find "<term>" --json       # keyword search over names, signatures, docstrings, paths
+    code-fauna-codex deps <symbol> --json       # callers and callees (Python only)
+    code-fauna-codex unused --json              # never-called symbols — a hint, not a verdict
 
 These commands are offline: no network call, no API key, no quota. Call them freely.
 Only `embed` and `search` cost an API call; ask before running those.
@@ -28,9 +28,9 @@ Every command accepts `--json` and answers with one object on stdout:
 and "error" holds the message — read stdout, not stderr.
 
 Exit codes: 0 = success (including zero results), 1 = runtime failure,
-2 = you must act (missing atlas or index, missing/invalid API key, incompatible schema).
-On a 2, read the error message: it names the fix, usually `fauna-codex scan` or
-`fauna-codex embed`. If it is still unclear, run `fauna-codex doctor`.
+2 = you must act (missing codex or index, missing/invalid API key, incompatible schema).
+On a 2, read the error message: it names the fix, usually `code-fauna-codex scan` or
+`code-fauna-codex embed`. If it is still unclear, run `code-fauna-codex doctor`.
 
 Report what you found before you write. If `find` returns a symbol that already covers
 the need, extend it rather than adding a sibling. If nothing matches, say so explicitly
@@ -47,6 +47,6 @@ the need, extend it rather than adding a sibling. If nothing matches, say so exp
   keep only the offline commands. Mode 1 is fully self-sufficient.
 - **If the repository is not Python**, delete the `deps` and `unused` lines: call edges
   are extracted from Python's `ast` and do not exist for other languages.
-- **If the agent has no shell access**, `import fauna_codex` exposes the same functions —
-  `scan.build_atlas`, `edges.callers_of`, `edges.unreferenced_symbols`,
-  `diff.diff_atlases` — with no subprocess in between.
+- **If the agent has no shell access**, `import code_fauna_codex` exposes the same functions —
+  `scan.build_codex`, `edges.callers_of`, `edges.unreferenced_symbols`,
+  `diff.diff_codexes` — with no subprocess in between.

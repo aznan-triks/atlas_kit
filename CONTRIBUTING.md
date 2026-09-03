@@ -18,10 +18,10 @@ change, however good it otherwise is.
    `unused`, `diff`, `doctor`) must never require an API key, a network call, or an
    optional dependency. This is the project's differentiator, not an implementation
    detail.
-3. **Fail Fast, never a silent fallback.** A missing key, an unreadable index, an atlas
+3. **Fail Fast, never a silent fallback.** A missing key, an unreadable index, a codex
    from an incompatible schema: say so, exit non-zero. Never quietly switch provider,
    never quietly degrade to mechanical mode, never treat a missing file as an empty
-   one. The project has shipped that last bug once — a missing atlas read as empty,
+   one. The project has shipped that last bug once — a missing codex read as empty,
    which pruned an entire index while reporting success.
 4. **No hardcoded secrets.** Keys come from environment variables. Always.
 5. **DRY.** One implementation of a rule. If two commands need the same check, it is

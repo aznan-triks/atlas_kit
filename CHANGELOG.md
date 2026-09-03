@@ -6,6 +6,16 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/).
 ## [Unreleased]
 
 ### Changed
+- **Project renamed again: `fauna-codex` → `code-fauna-codex`.** Package `fauna_codex` →
+  `code_fauna_codex`, CLI entry point `fauna-codex` → `code-fauna-codex`, ignore file
+  `.faunacodexignore` → `.codefaunacodexignore`. GitHub repo renamed to
+  `github.com/aznan-triks/code-fauna-codex` (old URL redirects). Never published to PyPI
+  under the previous name, so this is a pre-release identity fix, not a deprecation.
+- **Vocabulary rename: "atlas" → "codex" throughout.** Breaking `--json` contract change:
+  `atlas_schema_version` → `codex_schema_version` key,
+  `ATLAS_SCHEMA_VERSION` → `CODEX_SCHEMA_VERSION` constant. CLI: `--atlas` flag →
+  `--codex` on every subcommand that takes it, default output filename `atlas.json` →
+  `codex.json`. No behavior change beyond naming.
 - **Project renamed: `atlas-kit` → `fauna-codex`.** Package `atlas_kit` → `fauna_codex`,
   CLI entry point `atlas-kit` → `fauna-codex`, ignore file `.atlaskitignore` →
   `.faunacodexignore`. `atlas-kit` was never published to PyPI, so this is a pre-release

@@ -1,5 +1,5 @@
 """Tests — the `--json` envelope of the four semantic commands, plus the two
-fail-fast compatibility guards every reader now applies (index key schema, atlas
+fail-fast compatibility guards every reader now applies (index key schema, codex
 schema). No network: the provider's HTTP hook is monkeypatched, exactly as in
 tests/test_cli_semantic.py.
 
@@ -15,9 +15,9 @@ import pytest
 
 from conftest import write
 
-from fauna_codex.cli import main
-from fauna_codex.index_store import ATLAS_SCHEMA_VERSION
-from fauna_codex.semantic import (
+from code_fauna_codex.cli import main
+from code_fauna_codex.index_store import CODEX_SCHEMA_VERSION
+from code_fauna_codex.semantic import (
     CURRENT_KEY_SCHEMA, cmd_embed, cmd_search, cmd_similar, cmd_status,
 )
 
@@ -41,14 +41,14 @@ def fake_gemini(monkeypatch):
         n = len(json_body["requests"])
         return _FakeResp(200, {"embeddings": [{"values": [1.0, 0.0]}] * n})
 
-    import fauna_codex.providers.gemini as gemini_mod
+    import code_fauna_codex.providers.gemini as gemini_mod
     monkeypatch.setattr(gemini_mod, "_default_http_post", fake_post)
 
 
 @pytest.fixture
-def atlas_path(tmp_path):
+def codex_path(tmp_path):
     write(tmp_path, "jobs.py", 'def cancel_job(job_id):\n    """Cancel a running job."""\n    pass\n')
-    path = tmp_path / "atlas.json"
+    path = tmp_path / "codex.json"
     main(["scan", str(tmp_path), "--out", str(path)])
     return path
 
@@ -83,15 +83,15 @@ def _write_index(tmp_path, *, key_schema=CURRENT_KEY_SCHEMA, centroid=None):
     return path
 
 
-def _write_atlas(tmp_path, *, schema_version=ATLAS_SCHEMA_VERSION):
-    atlas = {"root": str(tmp_path), "files": {}, "symbols": {"python_functions": [
+def _write_codex(tmp_path, *, schema_version=CODEX_SCHEMA_VERSION):
+    codex = {"root": str(tmp_path), "files": {}, "symbols": {"python_functions": [
         {"name": "cancel_job", "file": "jobs.py", "line": 10,
          "signature": "def cancel_job(job_id)", "docstring": "Cancel a running job."},
     ]}}
     if schema_version is not None:
-        atlas["schema_version"] = schema_version
-    path = tmp_path / "atlas.json"
-    path.write_text(json.dumps(atlas), encoding="utf-8")
+        codex["schema_version"] = schema_version
+    path = tmp_path / "codex.json"
+    path.write_text(json.dumps(codex), encoding="utf-8")
     return path
 
 
@@ -103,16 +103,16 @@ def _payload(capsys):
 
 # --- embed ------------------------------------------------------------------
 
-def test_embed_json_envelope_carries_the_documented_keys(atlas_path, tmp_path, fake_gemini, capsys):
+def test_embed_json_envelope_carries_the_documented_keys(codex_path, tmp_path, fake_gemini, capsys):
     index_path = tmp_path / "semantic_index.json"
     capsys.readouterr()
-    code = cmd_embed(atlas_path, index_path, "gemini", None, None, 50, 5.0, as_json=True)
+    code = cmd_embed(codex_path, index_path, "gemini", None, None, 50, 5.0, as_json=True)
     payload = _payload(capsys)
 
     assert code == 0
     assert payload["ok"] is True
     assert payload["command"] == "embed"
-    assert payload["atlas"] == str(atlas_path)
+    assert payload["codex"] == str(codex_path)
     assert payload["index"] == str(index_path)
     assert payload["provider"] == "gemini"
     assert isinstance(payload["model"], str) and payload["model"]
@@ -123,17 +123,17 @@ def test_embed_json_envelope_carries_the_documented_keys(atlas_path, tmp_path, f
     assert payload["migrated"] == 0
 
 
-def test_embed_json_mode_prints_no_progress_lines(atlas_path, tmp_path, fake_gemini, capsys):
+def test_embed_json_mode_prints_no_progress_lines(codex_path, tmp_path, fake_gemini, capsys):
     """Batch progress ("  1/1") is human noise; in JSON mode it would break the
     one-object-on-stdout contract."""
     capsys.readouterr()
-    cmd_embed(atlas_path, tmp_path / "idx.json", "gemini", None, None, 1, 5.0, as_json=True)
+    cmd_embed(codex_path, tmp_path / "idx.json", "gemini", None, None, 1, 5.0, as_json=True)
     out = capsys.readouterr().out
     assert out.count("\n{") == 0  # a single top-level object, nothing before it
     assert "1/1" not in out
 
 
-def test_embed_json_error_when_atlas_missing(tmp_path, fake_gemini, capsys):
+def test_embed_json_error_when_codex_missing(tmp_path, fake_gemini, capsys):
     code = cmd_embed(tmp_path / "nope.json", tmp_path / "idx.json", "gemini", None, None,
                      50, 5.0, as_json=True)
     captured = capsys.readouterr()
@@ -141,16 +141,16 @@ def test_embed_json_error_when_atlas_missing(tmp_path, fake_gemini, capsys):
     assert code == 2
     assert payload["ok"] is False
     assert payload["command"] == "embed"
-    assert "Atlas not found" in payload["error"]
+    assert "Codex not found" in payload["error"]
     assert captured.err == ""  # JSON mode keeps stdout the only channel to read
 
 
-def test_embed_refuses_an_atlas_with_an_unreadable_schema(tmp_path, fake_gemini, capsys):
-    """Regression: a stale-schema atlas used to be trusted, and the prune step then
+def test_embed_refuses_an_codex_with_an_unreadable_schema(tmp_path, fake_gemini, capsys):
+    """Regression: a stale-schema codex used to be trusted, and the prune step then
     deleted every index entry it could not find in it."""
-    atlas = _write_atlas(tmp_path, schema_version=None)  # pre-schema_version atlas
+    codex = _write_codex(tmp_path, schema_version=None)  # pre-schema_version codex
     index_path = _write_index(tmp_path)
-    code = cmd_embed(atlas, index_path, "gemini", None, None, 50, 5.0)
+    code = cmd_embed(codex, index_path, "gemini", None, None, 50, 5.0)
     err = capsys.readouterr().err
     assert code == 2
     assert "scan" in err
@@ -228,43 +228,43 @@ def test_similar_json_reports_the_exclusion_flag(tmp_path, capsys):
 # --- status -----------------------------------------------------------------
 
 def test_status_json_envelope_carries_the_documented_keys(tmp_path, capsys):
-    atlas = _write_atlas(tmp_path)
+    codex = _write_codex(tmp_path)
     index_path = _write_index(tmp_path)
-    code = cmd_status(atlas, index_path, as_json=True)
+    code = cmd_status(codex, index_path, as_json=True)
     payload = _payload(capsys)
 
     assert code == 0
     assert payload["ok"] is True
     assert payload["command"] == "status"
-    assert payload["atlas"] == {"path": str(atlas), "resources": 1,
-                                "schema_version": ATLAS_SCHEMA_VERSION}
+    assert payload["codex"] == {"path": str(codex), "resources": 1,
+                                "schema_version": CODEX_SCHEMA_VERSION}
     assert payload["index"] == {"path": str(index_path), "resources": 3, "model": "m",
                                 "dim": 2, "key_schema": CURRENT_KEY_SCHEMA, "stale": 1}
 
 
-def test_status_json_error_when_atlas_missing(tmp_path, capsys):
+def test_status_json_error_when_codex_missing(tmp_path, capsys):
     code = cmd_status(tmp_path / "nope.json", tmp_path / "idx.json", as_json=True)
     captured = capsys.readouterr()
     payload = json.loads(captured.out)
     assert code == 2
     assert payload["ok"] is False
     assert payload["command"] == "status"
-    assert "Atlas not found" in payload["error"]
+    assert "Codex not found" in payload["error"]
     assert captured.err == ""
 
 
-def test_status_refuses_an_atlas_with_an_unreadable_schema(tmp_path, capsys):
-    atlas = _write_atlas(tmp_path, schema_version=ATLAS_SCHEMA_VERSION + 1)
-    code = cmd_status(atlas, _write_index(tmp_path))
+def test_status_refuses_an_codex_with_an_unreadable_schema(tmp_path, capsys):
+    codex = _write_codex(tmp_path, schema_version=CODEX_SCHEMA_VERSION + 1)
+    code = cmd_status(codex, _write_index(tmp_path))
     err = capsys.readouterr().err
     assert code == 2
-    assert "newer fauna-codex" in err
+    assert "newer code-fauna-codex" in err
 
 
 def test_status_still_reports_a_missing_index(tmp_path, capsys):
     """The key-schema guard must not turn "no index yet" into a hard error — an index
     with no entries carries no keys to misread."""
-    code = cmd_status(_write_atlas(tmp_path), tmp_path / "not_created_yet.json", as_json=True)
+    code = cmd_status(_write_codex(tmp_path), tmp_path / "not_created_yet.json", as_json=True)
     payload = _payload(capsys)
     assert code == 0
     assert payload["index"]["resources"] == 0
@@ -291,18 +291,18 @@ def test_similar_refuses_an_index_written_under_an_older_key_schema(tmp_path, ca
 
 def test_status_refuses_an_index_written_under_an_older_key_schema(tmp_path, capsys):
     index_path = _write_index(tmp_path, key_schema=None)
-    code = cmd_status(_write_atlas(tmp_path), index_path)
+    code = cmd_status(_write_codex(tmp_path), index_path)
     err = capsys.readouterr().err
     assert code == 2
     assert "key schema 1" in err and "embed" in err
 
 
-def test_readers_refuse_an_index_written_by_a_newer_fauna_codex(tmp_path, capsys):
+def test_readers_refuse_an_index_written_by_a_newer_code_fauna_codex(tmp_path, capsys):
     index_path = _write_index(tmp_path, key_schema=CURRENT_KEY_SCHEMA + 1)
     code = cmd_similar(index_path, 1.0, None, False)
     err = capsys.readouterr().err
     assert code == 2
-    assert "newer fauna-codex" in err
+    assert "newer code-fauna-codex" in err
 
 
 def test_key_schema_guard_reports_as_json_when_asked(tmp_path, capsys):

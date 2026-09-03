@@ -1,14 +1,14 @@
-"""Tests — fauna_codex.semantic (index build + cosine search). No network."""
+"""Tests — code_fauna_codex.semantic (index build + cosine search). No network."""
 from __future__ import annotations
 
-from fauna_codex.providers.base import l2_normalize
-from fauna_codex.semantic import (
-    DEFAULT_MIN_SCORE, centroid, cosine, entry_hash, iter_atlas_entries, pending_entries,
+from code_fauna_codex.providers.base import l2_normalize
+from code_fauna_codex.semantic import (
+    DEFAULT_MIN_SCORE, centroid, cosine, entry_hash, iter_codex_entries, pending_entries,
     recentre, search,
 )
 
 
-def _atlas():
+def _codex():
     return {"symbols": {
         "python_functions": [
             {"name": "cancel_job", "file": "jobs.py", "line": 10,
@@ -17,8 +17,8 @@ def _atlas():
     }}
 
 
-def test_iter_atlas_entries_produces_stable_keys_and_hashes():
-    entries = iter_atlas_entries(_atlas(), model="m", dim=4)
+def test_iter_codex_entries_produces_stable_keys_and_hashes():
+    entries = iter_codex_entries(_codex(), model="m", dim=4)
     assert len(entries) == 1
     # Key includes the line number (fix for the duplicate-name collision bug — see
     # tests/test_semantic_dedup_bug.py).
@@ -27,13 +27,13 @@ def test_iter_atlas_entries_produces_stable_keys_and_hashes():
 
 
 def test_pending_entries_skips_unchanged_hash():
-    entries = iter_atlas_entries(_atlas(), model="m", dim=4)
+    entries = iter_codex_entries(_codex(), model="m", dim=4)
     index = {"model": "m", "dim": 4, "entries": {entries[0]["key"]: {"hash": entries[0]["hash"]}}}
     assert pending_entries(entries, index, model="m", dim=4) == []
 
 
 def test_pending_entries_full_rebuild_when_model_changes():
-    entries = iter_atlas_entries(_atlas(), model="m", dim=4)
+    entries = iter_codex_entries(_codex(), model="m", dim=4)
     index = {"model": "other-model", "dim": 4, "entries": {}}
     assert pending_entries(entries, index, model="m", dim=4) == entries
 

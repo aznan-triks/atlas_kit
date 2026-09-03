@@ -1,13 +1,13 @@
-"""Tests — fauna_codex.edges (Python-only call/import edges, zero network, zero API key)."""
+"""Tests — code_fauna_codex.edges (Python-only call/import edges, zero network, zero API key)."""
 from __future__ import annotations
 
 import pytest
 from conftest import write
 
-from fauna_codex.edges import (
+from code_fauna_codex.edges import (
     callees_of, callers_of, parse_python_edges, unreferenced_symbols,
 )
-from fauna_codex.scan import build_atlas
+from code_fauna_codex.scan import build_codex
 
 SAMPLE = '''
 import os
@@ -91,24 +91,24 @@ def test_call_without_static_name_is_dropped(tmp_path):
     assert [row["callee"] for row in calls] == ["f"]
 
 
-def test_build_atlas_exposes_edges_block(tmp_path):
+def test_build_codex_exposes_edges_block(tmp_path):
     write(tmp_path, "mod.py", SAMPLE)
     write(tmp_path, "other.js", "function bar() { baz(); }\n")
 
-    atlas = build_atlas(tmp_path)
+    codex = build_codex(tmp_path)
 
-    assert atlas["edges"]["language"] == "python"
-    assert atlas["edges"]["imports"]["mod.py"] == [".rel", ".sibling", "a.b", "os", "pkg.mod"]
+    assert codex["edges"]["language"] == "python"
+    assert codex["edges"]["imports"]["mod.py"] == [".rel", ".sibling", "a.b", "os", "pkg.mod"]
     # JavaScript gets symbols but never edges — documented limitation.
-    assert "other.js" not in atlas["edges"]["imports"]
-    assert all(row["file"] == "mod.py" for row in atlas["edges"]["calls"])
+    assert "other.js" not in codex["edges"]["imports"]
+    assert all(row["file"] == "mod.py" for row in codex["edges"]["calls"])
 
 
-def test_build_atlas_calls_are_sorted_and_unique(tmp_path):
+def test_build_codex_calls_are_sorted_and_unique(tmp_path):
     write(tmp_path, "a.py", SAMPLE)
     write(tmp_path, "b.py", "def z():\n    top()\n")
 
-    calls = build_atlas(tmp_path)["edges"]["calls"]
+    calls = build_codex(tmp_path)["edges"]["calls"]
     keys = [(row["file"], row["caller"], row["callee"]) for row in calls]
     assert keys == sorted(keys)
     assert len(keys) == len(set(keys))
@@ -116,30 +116,30 @@ def test_build_atlas_calls_are_sorted_and_unique(tmp_path):
 
 def test_callers_of_matches_callee_last_segment(tmp_path):
     write(tmp_path, "mod.py", SAMPLE)
-    atlas = build_atlas(tmp_path)
+    codex = build_codex(tmp_path)
 
-    hits = callers_of(atlas, "top")
+    hits = callers_of(codex, "top")
     assert {row["caller"] for row in hits} == {"Greeter.hello"}
     # A dotted argument is reduced to its last segment before comparing.
-    assert callers_of(atlas, "pkg.mod.top") == hits
-    assert callers_of(atlas, "nothing_here") == []
+    assert callers_of(codex, "pkg.mod.top") == hits
+    assert callers_of(codex, "nothing_here") == []
 
 
 def test_callees_of_matches_exact_qualname_or_last_segment(tmp_path):
     write(tmp_path, "mod.py", SAMPLE)
-    atlas = build_atlas(tmp_path)
+    codex = build_codex(tmp_path)
 
-    assert {row["callee"] for row in callees_of(atlas, "Greeter.hello")} == {"top"}
-    assert {row["callee"] for row in callees_of(atlas, "hello")} == {"top"}
-    assert {row["callee"] for row in callees_of(atlas, "<module>")} == {"Greeter"}
-    assert callees_of(atlas, "nothing_here") == []
+    assert {row["callee"] for row in callees_of(codex, "Greeter.hello")} == {"top"}
+    assert {row["callee"] for row in callees_of(codex, "hello")} == {"top"}
+    assert {row["callee"] for row in callees_of(codex, "<module>")} == {"Greeter"}
+    assert callees_of(codex, "nothing_here") == []
 
 
 def test_unreferenced_symbols_reports_never_called_python_symbols(tmp_path):
     write(tmp_path, "mod.py", "def used():\n    pass\n\n\ndef unused():\n    used()\n")
-    atlas = build_atlas(tmp_path)
+    codex = build_codex(tmp_path)
 
-    names = {row["name"] for row in unreferenced_symbols(atlas)}
+    names = {row["name"] for row in unreferenced_symbols(codex)}
     assert names == {"unused"}
 
 
@@ -161,23 +161,23 @@ def main():
 def orphan():
     pass
 ''')
-    atlas = build_atlas(tmp_path)
+    codex = build_codex(tmp_path)
 
-    names = {row["name"] for row in unreferenced_symbols(atlas)}
+    names = {row["name"] for row in unreferenced_symbols(codex)}
     assert names == {"Thing", "orphan"}
 
 
 def test_unreferenced_symbols_ignores_non_python_symbols(tmp_path):
     write(tmp_path, "mod.js", "function lonely() {}\n")
-    atlas = build_atlas(tmp_path)
-    assert unreferenced_symbols(atlas) == []
+    codex = build_codex(tmp_path)
+    assert unreferenced_symbols(codex) == []
 
 
 def test_unreferenced_symbols_sorted_by_file_then_line(tmp_path):
     write(tmp_path, "b.py", "def b1():\n    pass\n\n\ndef b2():\n    pass\n")
     write(tmp_path, "a.py", "def a1():\n    pass\n")
-    atlas = build_atlas(tmp_path)
+    codex = build_codex(tmp_path)
 
-    rows = unreferenced_symbols(atlas)
+    rows = unreferenced_symbols(codex)
     assert [(row["file"], row["line"]) for row in rows] == [("a.py", 1), ("b.py", 1), ("b.py", 5)]
     assert rows[0]["section"] == "python_functions"

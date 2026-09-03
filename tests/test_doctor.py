@@ -8,8 +8,8 @@ from pathlib import Path
 
 import pytest
 
-from fauna_codex.doctor import cmd_doctor
-from fauna_codex.index_store import ATLAS_SCHEMA_VERSION, save_json
+from code_fauna_codex.doctor import cmd_doctor
+from code_fauna_codex.index_store import CODEX_SCHEMA_VERSION, save_json
 
 SECRET = "sk-doctor-must-never-print-this"
 SECRET_A = "sk-key-alpha-secret"
@@ -22,10 +22,10 @@ def _clear_keys(monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.delenv(var, raising=False)
 
 
-def _atlas(tmp_path: Path) -> Path:
-    path = tmp_path / "atlas.json"
+def _codex(tmp_path: Path) -> Path:
+    path = tmp_path / "codex.json"
     save_json(path, {
-        "schema_version": ATLAS_SCHEMA_VERSION,
+        "schema_version": CODEX_SCHEMA_VERSION,
         "root": str(tmp_path),
         "files": {"a.py": "hash-a", "b.py": "hash-b"},
         "symbols": {"functions": [
@@ -53,7 +53,7 @@ def _index(tmp_path: Path) -> Path:
 
 def test_no_key_configured_reports_zero(tmp_path, capsys, monkeypatch):
     _clear_keys(monkeypatch)
-    assert cmd_doctor(tmp_path / "atlas.json", tmp_path / "index.json") == 0
+    assert cmd_doctor(tmp_path / "codex.json", tmp_path / "index.json") == 0
     out = capsys.readouterr().out
     assert "no key configured" in out
     assert "gemini" in out and "openai" in out
@@ -62,7 +62,7 @@ def test_no_key_configured_reports_zero(tmp_path, capsys, monkeypatch):
 def test_singular_env_var_counts_one_and_never_prints_the_value(tmp_path, capsys, monkeypatch):
     _clear_keys(monkeypatch)
     monkeypatch.setenv("GEMINI_API_KEY", SECRET)
-    assert cmd_doctor(tmp_path / "atlas.json", tmp_path / "index.json") == 0
+    assert cmd_doctor(tmp_path / "codex.json", tmp_path / "index.json") == 0
     out = capsys.readouterr().out
     assert "1 key(s) configured" in out
     assert SECRET not in out
@@ -71,7 +71,7 @@ def test_singular_env_var_counts_one_and_never_prints_the_value(tmp_path, capsys
 def test_plural_env_var_counts_three_and_never_prints_any_value(tmp_path, capsys, monkeypatch):
     _clear_keys(monkeypatch)
     monkeypatch.setenv("GEMINI_API_KEYS", f"{SECRET_A}, {SECRET_B},{SECRET_C}")
-    assert cmd_doctor(tmp_path / "atlas.json", tmp_path / "index.json") == 0
+    assert cmd_doctor(tmp_path / "codex.json", tmp_path / "index.json") == 0
     out = capsys.readouterr().out
     assert "3 key(s) configured" in out
     for secret in (SECRET_A, SECRET_B, SECRET_C):
@@ -81,7 +81,7 @@ def test_plural_env_var_counts_three_and_never_prints_any_value(tmp_path, capsys
 def test_json_mode_never_prints_a_key_value_either(tmp_path, capsys, monkeypatch):
     _clear_keys(monkeypatch)
     monkeypatch.setenv("OPENAI_API_KEYS", f"{SECRET_A},{SECRET_B}")
-    assert cmd_doctor(tmp_path / "atlas.json", tmp_path / "index.json", as_json=True) == 0
+    assert cmd_doctor(tmp_path / "codex.json", tmp_path / "index.json", as_json=True) == 0
     out = capsys.readouterr().out
     assert SECRET_A not in out and SECRET_B not in out
     providers = {p["name"]: p for p in json.loads(out)["providers"]}
@@ -89,20 +89,20 @@ def test_json_mode_never_prints_a_key_value_either(tmp_path, capsys, monkeypatch
     assert providers["local"]["requires_api_key"] is False
 
 
-def test_missing_atlas_and_index_still_exit_zero(tmp_path, capsys, monkeypatch):
+def test_missing_codex_and_index_still_exit_zero(tmp_path, capsys, monkeypatch):
     _clear_keys(monkeypatch)
     assert cmd_doctor(tmp_path / "nope.json", tmp_path / "nada.json") == 0
     out = capsys.readouterr().out
     assert "MISSING" in out
-    assert "fauna-codex scan" in out and "fauna-codex embed" in out
+    assert "code-fauna-codex scan" in out and "code-fauna-codex embed" in out
 
 
-def test_real_atlas_and_index_are_summarised(tmp_path, capsys, monkeypatch):
+def test_real_codex_and_index_are_summarised(tmp_path, capsys, monkeypatch):
     _clear_keys(monkeypatch)
-    assert cmd_doctor(_atlas(tmp_path), _index(tmp_path)) == 0
+    assert cmd_doctor(_codex(tmp_path), _index(tmp_path)) == 0
     out = capsys.readouterr().out
     assert "2 file(s), 2 symbol(s)" in out
-    assert f"schema {ATLAS_SCHEMA_VERSION}" in out
+    assert f"schema {CODEX_SCHEMA_VERSION}" in out
     assert "1 entrie(s)" in out
     assert "text-embedding-004" in out
     assert "centroid: present" in out
@@ -110,12 +110,12 @@ def test_real_atlas_and_index_are_summarised(tmp_path, capsys, monkeypatch):
 
 def test_json_mode_is_valid_json_with_ok_and_command(tmp_path, capsys, monkeypatch):
     _clear_keys(monkeypatch)
-    assert cmd_doctor(_atlas(tmp_path), _index(tmp_path), as_json=True) == 0
+    assert cmd_doctor(_codex(tmp_path), _index(tmp_path), as_json=True) == 0
     payload = json.loads(capsys.readouterr().out)
     assert payload["ok"] is True
     assert payload["command"] == "doctor"
-    assert payload["files"]["atlas"]["symbol_count"] == 2
-    assert payload["files"]["atlas"]["schema_version"] == ATLAS_SCHEMA_VERSION
+    assert payload["files"]["codex"]["symbol_count"] == 2
+    assert payload["files"]["codex"]["schema_version"] == CODEX_SCHEMA_VERSION
     assert payload["files"]["index"]["entry_count"] == 1
     assert payload["files"]["index"]["key_schema"] == 2
     assert payload["files"]["index"]["has_centroid"] is True
@@ -123,9 +123,9 @@ def test_json_mode_is_valid_json_with_ok_and_command(tmp_path, capsys, monkeypat
     assert ".py" in payload["parsers"]["backend_by_extension"]
 
 
-def test_malformed_atlas_is_reported_not_crashed(tmp_path, capsys, monkeypatch):
+def test_malformed_codex_is_reported_not_crashed(tmp_path, capsys, monkeypatch):
     _clear_keys(monkeypatch)
-    broken = tmp_path / "atlas.json"
+    broken = tmp_path / "codex.json"
     broken.write_text("{not json", encoding="utf-8")
     assert cmd_doctor(broken, tmp_path / "index.json") == 0
     assert "invalid JSON" in capsys.readouterr().out
@@ -133,7 +133,7 @@ def test_malformed_atlas_is_reported_not_crashed(tmp_path, capsys, monkeypatch):
 
 def test_parser_backends_cover_every_supported_extension(tmp_path, capsys, monkeypatch):
     _clear_keys(monkeypatch)
-    from fauna_codex.scan import SUPPORTED_EXTENSIONS
+    from code_fauna_codex.scan import SUPPORTED_EXTENSIONS
 
     assert cmd_doctor(tmp_path / "a.json", tmp_path / "i.json", as_json=True) == 0
     backends = json.loads(capsys.readouterr().out)["parsers"]["backend_by_extension"]
